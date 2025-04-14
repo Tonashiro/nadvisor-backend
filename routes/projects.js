@@ -4,7 +4,6 @@ const router = express.Router();
 const supabase = require("../config/supabase");
 const { authenticate, isAdmin } = require("../middlewares/auth");
 
-// Récupérer toutes les catégories
 router.get("/categories", async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -21,7 +20,6 @@ router.get("/categories", async (req, res) => {
   }
 });
 
-// Récupérer tous les projets avec filtres
 router.get("/", async (req, res) => {
   try {
     const {
