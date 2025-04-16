@@ -1,4 +1,6 @@
 -- schema.sql
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Table utilisateurs (stocke les infos Discord)
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

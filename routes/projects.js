@@ -140,6 +140,7 @@ router.get("/:id", async (req, res) => {
 // Créer un nouveau projet (admin seulement)
 router.post("/", authenticate, isAdmin, async (req, res) => {
   try {
+    console.log("req.user:", req);
     const {
       name,
       description,
