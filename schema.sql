@@ -9,6 +9,7 @@ CREATE TABLE users (
   avatar TEXT,
   is_admin BOOLEAN DEFAULT FALSE,
   has_monad_role BOOLEAN DEFAULT FALSE,
+  monad_role TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

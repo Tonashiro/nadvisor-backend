@@ -54,6 +54,7 @@ router.get("/discord/callback", async (req, res) => {
 
     // Récupérer le statut du membre dans le serveur Monad
     let hasMonadRole = false;
+    let monadRole = null;
     try {
       const memberResponse = await axios.get(
         `https://discord.com/api/users/@me/guilds/${process.env.MONAD_SERVER_ID}/member`,
@@ -68,6 +69,9 @@ router.get("/discord/callback", async (req, res) => {
       hasMonadRole = memberResponse.data.roles.includes(
         process.env.MONAD_ROLE_ID
       );
+
+      // Stocker le rôle exact
+      monadRole = memberResponse.data.roles[0] || null;
     } catch (error) {
       console.log(
         "Utilisateur pas membre du serveur Monad ou erreur API Discord"
@@ -97,6 +101,7 @@ router.get("/discord/callback", async (req, res) => {
           avatar: userResponse.data.avatar,
           is_admin: isAdmin,
           has_monad_role: hasMonadRole,
+          monad_role: monadRole,
         })
         .eq("discord_id", userResponse.data.id)
         .select()
@@ -113,6 +118,7 @@ router.get("/discord/callback", async (req, res) => {
           avatar: userResponse.data.avatar,
           is_admin: isAdmin,
           has_monad_role: hasMonadRole,
+          monad_role: monadRole,
         })
         .select()
         .single();
@@ -127,6 +133,7 @@ router.get("/discord/callback", async (req, res) => {
         discord_id: user.discord_id,
         is_admin: user.is_admin,
         has_monad_role: user.has_monad_role,
+        monad_role: user.monad_role,
       },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
@@ -140,6 +147,7 @@ router.get("/discord/callback", async (req, res) => {
         avatar: user.avatar,
         is_admin: user.is_admin,
         has_monad_role: user.has_monad_role,
+        monad_role: user.monad_role,
       },
     });
   } catch (error) {
@@ -156,6 +164,7 @@ router.get("/me", authenticate, (req, res) => {
     avatar: req.user.avatar,
     is_admin: req.user.is_admin,
     has_monad_role: req.user.has_monad_role,
+    monad_role: req.user.monad_role,
   });
 });
 
