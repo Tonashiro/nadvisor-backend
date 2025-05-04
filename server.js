@@ -4,11 +4,13 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
 
 // Routes
 const authRoutes = require("./routes/auth");
 const projectsRoutes = require("./routes/projects");
 const votesRoutes = require("./routes/votes");
+const healthRoute = require("./routes/health");
 
 // Initialisation de l'application
 const app = express();
@@ -19,11 +21,13 @@ app.use(helmet()); // Sécurité
 app.use(cors()); // CORS pour les requêtes du frontend
 app.use(express.json()); // Parser JSON
 app.use(morgan("dev")); // Logging
+app.use(cookieParser());
 
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/votes", votesRoutes);
+app.use("/api/health", healthRoute);
 
 // Route racine
 app.get("/", (req, res) => {
@@ -92,6 +96,11 @@ app.get("/api/docs", (req, res) => {
         path: "/api/votes/me",
         method: "GET",
         description: "Obtenir tous les votes de l'utilisateur connecté",
+      },
+      {
+        path: "/api/health",
+        method: "GET",
+        description: "Database health check",
       },
     ],
   });
