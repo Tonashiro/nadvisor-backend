@@ -26,7 +26,7 @@ router.get("/discord/callback", async (req, res) => {
       return res.status(400).json({ message: "Authorization code required" });
     }
 
-    // Exchange the code for a Discord token
+    // Échanger le code contre un token Discord
     const tokenResponse = await axios.post(
       "https://discord.com/api/oauth2/token",
       new URLSearchParams({
@@ -46,16 +46,15 @@ router.get("/discord/callback", async (req, res) => {
 
     const { access_token } = tokenResponse.data;
 
-    // Retrieve Discord user information
+    // Récupérer les infos de l'utilisateur Discord
     const userResponse = await axios.get("https://discord.com/api/users/@me", {
       headers: {
         Authorization: `Bearer ${access_token}`,
       },
     });
 
-    // Retrieve member status in the Monad server
+    // Récupérer le statut du membre dans le serveur Monad
     let hasMonadRole = false;
-    let monadRole = null;
     try {
       const memberResponse = await axios.get(
         `https://discord.com/api/users/@me/guilds/${process.env.MONAD_SERVER_ID}/member`,
@@ -66,25 +65,20 @@ router.get("/discord/callback", async (req, res) => {
         }
       );
 
-      // Check if the user has the MON role
+      // Vérifier si l'utilisateur a le rôle MON
       hasMonadRole = memberResponse.data.roles.includes(
         process.env.MONAD_ROLE_ID
       );
-
-      // Stocker le rôle exact
-      monadRole = memberResponse.data.roles[0] || null;
     } catch (error) {
-      console.log(
-        "User is not a member of the Monad server or Discord API error"
-      );
+      console.log("User not a member of the Monad server or Discord API error");
     }
 
-    // Check if the user is an admin
+    // Vérifier si c'est un admin
     const isAdmin = process.env.ADMIN_DISCORD_IDS.split(",").includes(
       userResponse.data.id
     );
 
-    // Find or create the user in Supabase
+    // Rechercher ou créer l'utilisateur dans Supabase
     const { data: existingUser } = await supabase
       .from("users")
       .select("*")
@@ -94,7 +88,7 @@ router.get("/discord/callback", async (req, res) => {
     let user;
 
     if (existingUser) {
-      // Update the existing user
+      // Mettre à jour l'utilisateur existant
       const { data: updatedUser } = await supabase
         .from("users")
         .update({
@@ -102,7 +96,6 @@ router.get("/discord/callback", async (req, res) => {
           avatar: userResponse.data.avatar,
           is_admin: isAdmin,
           has_monad_role: hasMonadRole,
-          monad_role: monadRole,
         })
         .eq("discord_id", userResponse.data.id)
         .select()
@@ -110,7 +103,7 @@ router.get("/discord/callback", async (req, res) => {
 
       user = updatedUser;
     } else {
-      // Create a new user
+      // Créer un nouvel utilisateur
       const { data: newUser } = await supabase
         .from("users")
         .insert({
@@ -119,7 +112,6 @@ router.get("/discord/callback", async (req, res) => {
           avatar: userResponse.data.avatar,
           is_admin: isAdmin,
           has_monad_role: hasMonadRole,
-          monad_role: monadRole,
         })
         .select()
         .single();
@@ -127,14 +119,13 @@ router.get("/discord/callback", async (req, res) => {
       user = newUser;
     }
 
-    // Generate JWT for authentication
+    // Générer JWT pour l'authentification
     const token = jwt.sign(
       {
         id: user.id,
         discord_id: user.discord_id,
         is_admin: user.is_admin,
         has_monad_role: user.has_monad_role,
-        monad_role: user.monad_role,
       },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
@@ -150,12 +141,12 @@ router.get("/discord/callback", async (req, res) => {
 
     res.redirect(process.env.DISCORD_RETURN_TO);
   } catch (error) {
-    console.error("Discord authentication error:", error);
+    console.error("Discord Authentication Error:", error);
     res.status(500).json({ message: "Authentication failed" });
   }
 });
 
-// Retrieve the currently logged-in user
+// Récupérer l'utilisateur actuellement connecté
 router.get("/me", authenticate, (req, res) => {
   res.json({
     id: req.user.id,
@@ -164,7 +155,6 @@ router.get("/me", authenticate, (req, res) => {
     avatar: req.user.avatar,
     is_admin: req.user.is_admin,
     has_monad_role: req.user.has_monad_role,
-    monad_role: req.user.monad_role,
   });
 });
 
