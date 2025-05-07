@@ -134,7 +134,7 @@ router.get("/discord/callback", async (req, res) => {
     res.cookie("discord", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // or "strict"
+      sameSite: "none", // or "strict"
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: "/",
     });

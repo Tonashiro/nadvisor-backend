@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middlewares
 app.use(helmet()); // Security
-app.use(cors()); // CORS for frontend requests
+app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true })); // CORS for frontend requests
 app.use(express.json()); // JSON parser
 app.use(morgan("dev")); // Logging
 app.use(cookieParser());
@@ -109,9 +109,7 @@ app.get("/api/docs", (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res
-    .status(500)
-    .json({ message: "Server error, please try again later" });
+  res.status(500).json({ message: "Server error, please try again later" });
 });
 
 // Start the server
