@@ -131,15 +131,8 @@ router.get("/discord/callback", async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    res.cookie("discord", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "none", // or "strict"
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: "/",
-    });
-
-    res.redirect(process.env.DISCORD_RETURN_TO);
+    // Redirect with token in the URL
+    res.redirect(`${process.env.DISCORD_RETURN_TO}?token=${token}`);
   } catch (error) {
     console.error("Discord Authentication Error:", error);
     res.status(500).json({ message: "Authentication failed" });
