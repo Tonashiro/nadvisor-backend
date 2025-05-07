@@ -15,7 +15,7 @@ router.get("/discord", (req, res) => {
     REDIRECT_URI
   )}&response_type=code&scope=${encodeURIComponent(scope)}`;
 
-  res.json({ url });
+  res.redirect(url);
 });
 
 router.get("/discord/callback", async (req, res) => {
@@ -35,6 +35,7 @@ router.get("/discord/callback", async (req, res) => {
         grant_type: "authorization_code",
         code,
         redirect_uri: process.env.DISCORD_REDIRECT_URI,
+        return_to: process.env.DISCORD_RETURN_TO,
       }),
       {
         headers: {
@@ -139,17 +140,15 @@ router.get("/discord/callback", async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        avatar: user.avatar,
-        is_admin: user.is_admin,
-        has_monad_role: user.has_monad_role,
-        monad_role: user.monad_role,
-      },
+    res.cookie("discord", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax", // or "strict"
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: "/",
     });
+
+    res.redirect(process.env.DISCORD_RETURN_TO);
   } catch (error) {
     console.error("Discord authentication error:", error);
     res.status(500).json({ message: "Authentication failed" });
@@ -160,6 +159,7 @@ router.get("/discord/callback", async (req, res) => {
 router.get("/me", authenticate, (req, res) => {
   res.json({
     id: req.user.id,
+    discord_id: req.user.discord_id,
     username: req.user.username,
     avatar: req.user.avatar,
     is_admin: req.user.is_admin,

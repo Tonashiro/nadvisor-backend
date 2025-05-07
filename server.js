@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
 
 // Routes
 const authRoutes = require("./routes/auth");
@@ -21,6 +22,7 @@ app.use(helmet()); // Security
 app.use(cors()); // CORS for frontend requests
 app.use(express.json()); // JSON parser
 app.use(morgan("dev")); // Logging
+app.use(cookieParser());
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -94,6 +96,11 @@ app.get("/api/docs", (req, res) => {
         path: "/api/votes/me",
         method: "GET",
         description: "Get all votes of the logged-in user",
+      },
+      {
+        path: "/api/health",
+        method: "GET",
+        description: "Database health check",
       },
     ],
   });
