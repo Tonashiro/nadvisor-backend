@@ -2,19 +2,19 @@
 const jwt = require("jsonwebtoken");
 const supabase = require("../config/supabase");
 
-// Middleware d'authentification de base
+// Basic authentication middleware
 exports.authenticate = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ message: "Authentification requise" });
+      return res.status(401).json({ message: "Authentication required" });
     }
 
-    // Vérifier le JWT
+    // Verify the JWT
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Chercher l'utilisateur dans Supabase
+    // Fetch the user from Supabase
     const { data: user, error } = await supabase
       .from("users")
       .select("*")
@@ -22,30 +22,30 @@ exports.authenticate = async (req, res, next) => {
       .single();
 
     if (error || !user) {
-      return res.status(401).json({ message: "Utilisateur non trouvé" });
+      return res.status(401).json({ message: "User not found" });
     }
 
-    // Ajouter l'utilisateur à la requête
+    // Add the user to the request
     req.user = user;
     next();
   } catch (error) {
-    console.error("Erreur d'authentification:", error);
-    res.status(401).json({ message: "Token invalide ou expiré" });
+    console.error("Authentication error:", error);
+    res.status(401).json({ message: "Invalid or expired token" });
   }
 };
 
-// Vérifier si l'utilisateur est admin
+// Check if the user is an admin
 exports.isAdmin = (req, res, next) => {
   if (!req.user.is_admin) {
-    return res.status(403).json({ message: "Accès administrateur requis" });
+    return res.status(403).json({ message: "Admin access required" });
   }
   next();
 };
 
-// Vérifier si l'utilisateur peut voter (rôle MON)
+// Check if the user can vote (MON role)
 exports.canVote = (req, res, next) => {
   if (!req.user.has_monad_role) {
-    return res.status(403).json({ message: "Rôle MON requis pour voter" });
+    return res.status(403).json({ message: "MON role required to vote" });
   }
   next();
 };

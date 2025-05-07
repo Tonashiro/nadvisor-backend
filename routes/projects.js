@@ -15,8 +15,8 @@ router.get("/categories", async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error("Erreur lors de la récupération des catégories:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while retrieving categories:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -31,19 +31,19 @@ router.get("/", async (req, res) => {
       limit = 10,
     } = req.query;
 
-    // Construire la requête de base
+    // Build the base query
     let query = supabase.from("projects").select(`
         *,
         created_by:users(username, avatar),
         categories:project_categories(category:categories(id, name))
       `);
 
-    // Filtrer par statut si spécifié
+    // Filter by status if specified
     if (status) {
       query = query.eq("status", status);
     }
 
-    // Tri et pagination
+    // Sorting and pagination
     query = query
       .order(sort, { ascending: order === "asc" })
       .range((page - 1) * limit, page * limit - 1);
@@ -52,7 +52,7 @@ router.get("/", async (req, res) => {
 
     if (error) throw error;
 
-    // Filtrer les projets par catégorie si nécessaire (côté client car jointure)
+    // Filter projects by category if necessary (client-side due to join)
     let filteredProjects = data;
     if (category) {
       filteredProjects = data.filter((project) =>
@@ -62,7 +62,7 @@ router.get("/", async (req, res) => {
       );
     }
 
-    // Formater la réponse
+    // Format the response
     const formattedProjects = filteredProjects.map((project) => ({
       ...project,
       created_by: project.created_by
@@ -74,7 +74,7 @@ router.get("/", async (req, res) => {
       categories: project.categories.map((c) => c.category),
     }));
 
-    // Obtenir le nombre total pour la pagination
+    // Get the total count for pagination
     const { count: totalCount } = await supabase
       .from("projects")
       .select("*", { count: "exact", head: true });
@@ -89,12 +89,12 @@ router.get("/", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Erreur lors de la récupération des projets:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while retrieving projects:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Récupérer un projet par son ID
+// Retrieve a project by its ID
 router.get("/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -113,12 +113,12 @@ router.get("/:id", async (req, res) => {
 
     if (error) {
       if (error.code === "PGRST116") {
-        return res.status(404).json({ message: "Projet non trouvé" });
+        return res.status(404).json({ message: "Project not found" });
       }
       throw error;
     }
 
-    // Formater la réponse
+    // Format the response
     const formattedProject = {
       ...data,
       created_by: data.created_by
@@ -132,12 +132,12 @@ router.get("/:id", async (req, res) => {
 
     res.json(formattedProject);
   } catch (error) {
-    console.error("Erreur lors de la récupération du projet:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while retrieving the project:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Créer un nouveau projet (admin seulement)
+// Create a new project (admin only)
 router.post("/", authenticate, isAdmin, async (req, res) => {
   try {
     console.log("req.user:", req);
@@ -147,17 +147,19 @@ router.post("/", authenticate, isAdmin, async (req, res) => {
       website,
       twitter,
       discord,
+      logo_url,
+      banner_url,
       github,
       categories,
       status = "PENDING",
     } = req.body;
 
-    // Validation de base
+    // Basic validation
     if (!name || !description) {
-      return res.status(400).json({ message: "Nom et description requis" });
+      return res.status(400).json({ message: "Name and description required" });
     }
 
-    // Insertion du projet
+    // Insert the project
     const { data: project, error } = await supabase
       .from("projects")
       .insert({
@@ -168,6 +170,8 @@ router.post("/", authenticate, isAdmin, async (req, res) => {
         discord,
         github,
         status,
+        logo_url,
+        banner_url,
         created_by: req.user.id,
       })
       .select()
@@ -175,15 +179,15 @@ router.post("/", authenticate, isAdmin, async (req, res) => {
 
     if (error) {
       if (error.code === "23505") {
-        // Violation d'unicité
+        // Uniqueness violation
         return res
           .status(400)
-          .json({ message: "Un projet avec ce nom existe déjà" });
+          .json({ message: "A project with this name already exists" });
       }
       throw error;
     }
 
-    // Ajout des catégories si spécifiées
+    // Add categories if specified
     if (categories && categories.length > 0) {
       const categoryLinks = categories.map((categoryId) => ({
         project_id: project.id,
@@ -196,14 +200,26 @@ router.post("/", authenticate, isAdmin, async (req, res) => {
 
       if (categoryError) throw categoryError;
     }
+    const { data: projectCategories, error: fetchError } = await supabase
+      .from("project_categories")
+      .select("category:categories(id, name, description)")
+      .eq("project_id", project.id);
 
-    res.status(201).json(project);
+    if (fetchError) throw fetchError;
+
+    const formattedCategories = projectCategories.map((pc) => pc.category);
+
+    res.status(201).json({
+      ...project,
+      categories: formattedCategories,
+    });
   } catch (error) {
-    console.error("Erreur lors de la création du projet:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while creating the project:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
+// Update a project (admin only)
 router.put("/:id", authenticate, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -225,10 +241,10 @@ router.put("/:id", authenticate, isAdmin, async (req, res) => {
       .single();
 
     if (checkError) {
-      return res.status(404).json({ message: "Projet non trouvé" });
+      return res.status(404).json({ message: "Project not found" });
     }
 
-    // Mettre à jour le projet
+    // Update the project
     const { data: project, error } = await supabase
       .from("projects")
       .update({
@@ -248,17 +264,17 @@ router.put("/:id", authenticate, isAdmin, async (req, res) => {
       if (error.code === "23505") {
         return res
           .status(400)
-          .json({ message: "Un projet avec ce nom existe déjà" });
+          .json({ message: "A project with this name already exists" });
       }
       throw error;
     }
 
-    // Mettre à jour les catégories si spécifiées
+    // Update categories if specified
     if (categories) {
-      // Supprimer les liens existants
+      // Delete existing links
       await supabase.from("project_categories").delete().eq("project_id", id);
 
-      // Ajouter les nouveaux liens
+      // Add new links
       if (categories.length > 0) {
         const categoryLinks = categories.map((categoryId) => ({
           project_id: id,
@@ -273,14 +289,27 @@ router.put("/:id", authenticate, isAdmin, async (req, res) => {
       }
     }
 
-    res.json(project);
+    // Retrieve categories associated with the project
+    const { data: projectCategories, error: fetchError } = await supabase
+      .from("project_categories")
+      .select("category:categories(id, name, description)")
+      .eq("project_id", id);
+
+    if (fetchError) throw fetchError;
+
+    const formattedCategories = projectCategories.map((pc) => pc.category);
+
+    res.json({
+      ...project,
+      categories: formattedCategories,
+    });
   } catch (error) {
-    console.error("Erreur lors de la mise à jour du projet:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while updating the project:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Supprimer un projet (admin seulement)
+// Delete a project (admin only)
 router.delete("/:id", authenticate, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -289,20 +318,20 @@ router.delete("/:id", authenticate, isAdmin, async (req, res) => {
 
     if (error) throw error;
 
-    res.json({ message: "Projet supprimé avec succès" });
+    res.json({ message: "Project successfully deleted" });
   } catch (error) {
-    console.error("Erreur lors de la suppression du projet:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while deleting the project:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Ajouter une catégorie (admin seulement)
+// Add a category (admin only)
 router.post("/categories", authenticate, isAdmin, async (req, res) => {
   try {
     const { name, description } = req.body;
 
     if (!name) {
-      return res.status(400).json({ message: "Nom de catégorie requis" });
+      return res.status(400).json({ message: "Category name required" });
     }
 
     const { data, error } = await supabase
@@ -313,15 +342,15 @@ router.post("/categories", authenticate, isAdmin, async (req, res) => {
 
     if (error) {
       if (error.code === "23505") {
-        return res.status(400).json({ message: "Cette catégorie existe déjà" });
+        return res.status(400).json({ message: "This category already exists" });
       }
       throw error;
     }
 
     res.status(201).json(data);
   } catch (error) {
-    console.error("Erreur lors de la création de la catégorie:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while creating the category:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 

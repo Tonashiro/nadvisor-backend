@@ -11,15 +11,16 @@ const authRoutes = require("./routes/auth");
 const projectsRoutes = require("./routes/projects");
 const votesRoutes = require("./routes/votes");
 const healthRoute = require("./routes/health");
+const uploadRoutes = require("./routes/uploads");
 
-// Initialisation de l'application
+// Application initialization
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middlewares
-app.use(helmet()); // Sécurité
-app.use(cors()); // CORS pour les requêtes du frontend
-app.use(express.json()); // Parser JSON
+app.use(helmet()); // Security
+app.use(cors()); // CORS for frontend requests
+app.use(express.json()); // JSON parser
 app.use(morgan("dev")); // Logging
 app.use(cookieParser());
 
@@ -28,74 +29,73 @@ app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/votes", votesRoutes);
 app.use("/api/health", healthRoute);
+app.use("/api/upload", uploadRoutes);
 
-// Route racine
+// Root route
 app.get("/", (req, res) => {
   res.json({
-    message:
-      "API de vote pour projets - Documentation disponible sur /api/docs",
+    message: "Project voting API - Documentation available at /api/docs",
   });
 });
 
-// Documentation simple
+// Simple documentation
 app.get("/api/docs", (req, res) => {
   res.json({
     endpoints: [
       {
         path: "/api/auth/discord",
         method: "GET",
-        description: "Obtenir l'URL d'authentification Discord",
+        description: "Get the Discord authentication URL",
       },
       {
         path: "/api/auth/discord/callback",
         method: "GET",
-        description: "Callback pour authentification Discord",
+        description: "Callback for Discord authentication",
       },
       {
         path: "/api/auth/me",
         method: "GET",
-        description: "Obtenir les informations de l'utilisateur connecté",
+        description: "Get information about the logged-in user",
       },
       {
         path: "/api/projects",
         method: "GET",
-        description: "Récupérer tous les projets avec filtres",
+        description: "Retrieve all projects with filters",
       },
       {
         path: "/api/projects/:id",
         method: "GET",
-        description: "Récupérer un projet par ID",
+        description: "Retrieve a project by ID",
       },
       {
         path: "/api/projects",
         method: "POST",
-        description: "Créer un nouveau projet (admin uniquement)",
+        description: "Create a new project (admin only)",
       },
       {
         path: "/api/projects/:id",
         method: "PUT",
-        description: "Mettre à jour un projet (admin uniquement)",
+        description: "Update a project (admin only)",
       },
       {
         path: "/api/projects/:id",
         method: "DELETE",
-        description: "Supprimer un projet (admin uniquement)",
+        description: "Delete a project (admin only)",
       },
       {
         path: "/api/votes/:projectId",
         method: "POST",
-        description:
-          "Voter pour un projet (utilisateurs avec rôle MON uniquement)",
+        description: "Vote for a project (users with MON role only)",
       },
       {
         path: "/api/votes/:projectId",
         method: "DELETE",
-        description: "Annuler un vote",
+        description: "Cancel a vote",
       },
       {
         path: "/api/votes/me",
         method: "GET",
-        description: "Obtenir tous les votes de l'utilisateur connecté",
+        description: "Get all votes of the logged-in user",
       },
       {
         path: "/api/health",
@@ -106,15 +106,15 @@ app.get("/api/docs", (req, res) => {
   });
 });
 
-// Middleware de gestion d'erreur
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res
     .status(500)
-    .json({ message: "Erreur serveur, veuillez réessayer plus tard" });
+    .json({ message: "Server error, please try again later" });
 });
 
-// Démarrage du serveur
+// Start the server
 app.listen(PORT, () => {
-  console.log(`Serveur démarré sur le port ${PORT}`);
+  console.log(`Server started on port ${PORT}`);
 });
