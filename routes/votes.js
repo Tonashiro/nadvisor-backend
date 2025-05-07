@@ -4,7 +4,7 @@ const router = express.Router();
 const supabase = require("../config/supabase");
 const { authenticate, canVote } = require("../middlewares/auth");
 
-// Voter pour un projet (nécessite le rôle MON)
+// Vote for a project (requires MON role)
 router.post("/:projectId", authenticate, canVote, async (req, res) => {
   try {
     const { projectId } = req.params;
@@ -15,10 +15,10 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
     if (!voteType || !["FOR", "AGAINST"].includes(voteType)) {
       return res
         .status(400)
-        .json({ message: "Type de vote invalide (FOR ou AGAINST requis)" });
+        .json({ message: "Invalid vote type (FOR or AGAINST required)" });
     }
 
-    // Vérifier si le projet existe
+    // Check if the project exists
     const { data: project, error: projectError } = await supabase
       .from("projects")
       .select("id")
@@ -26,13 +26,13 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
       .single();
 
     if (projectError) {
-      return res.status(404).json({ message: "Projet non trouvé" });
+      return res.status(404).json({ message: "Project not found" });
     }
 
-    // Vérifier si l'utilisateur a déjà voté
+    // Check if the user has already voted
     const { data: existingVote, error: voteError } = await supabase
       .from("votes")
-      .select("id, vote_type")
+      .select("id, vote_type, created_at")
       .eq("user_id", userId)
       .eq("project_id", projectId)
       .maybeSingle();
@@ -44,17 +44,20 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
     let result;
 
     if (existingVote) {
-      // Si le vote est identique, ne rien faire
+      // If the vote is the same, do nothing
       if (existingVote.vote_type === voteType) {
         return res
           .status(400)
-          .json({ message: "Vous avez déjà voté de cette façon" });
+          .json({ message: "You have already voted this way" });
       }
 
-      // Sinon, mettre à jour le vote existant
+      // Otherwise, update the existing vote
       const { data, error } = await supabase
         .from("votes")
-        .update({ vote_type: voteType })
+        .update({
+          vote_type: voteType,
+          last_modified_at: new Date(),
+        })
         .eq("id", existingVote.id)
         .select()
         .single();
@@ -62,13 +65,14 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
       if (error) throw error;
       result = { data, updated: true };
     } else {
-      // Créer un nouveau vote
+      // Create a new vote
       const { data, error } = await supabase
         .from("votes")
         .insert({
           user_id: userId,
           project_id: projectId,
           vote_type: voteType,
+          last_modified_at: new Date(),
         })
         .select()
         .single();
@@ -77,7 +81,7 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
       result = { data, created: true };
     }
 
-    // Récupérer les stats de vote mises à jour
+    // Retrieve updated vote stats
     const { data: updatedProject, error: statsError } = await supabase
       .from("projects")
       .select("votes_for, votes_against")
@@ -87,7 +91,7 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
     if (statsError) throw statsError;
 
     res.json({
-      message: result.updated ? "Vote mis à jour" : "Vote enregistré",
+      message: result.updated ? "Vote updated" : "Vote recorded",
       vote: result.data,
       stats: {
         votesFor: updatedProject.votes_for,
@@ -97,18 +101,18 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Erreur lors du vote:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while voting:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Annuler un vote
+// Cancel a vote
 router.delete("/:projectId", authenticate, async (req, res) => {
   try {
     const { projectId } = req.params;
     const userId = req.user.id;
 
-    // Vérifier si le vote existe
+    // Check if the vote exists
     const { data: vote, error: voteError } = await supabase
       .from("votes")
       .select("id")
@@ -117,10 +121,10 @@ router.delete("/:projectId", authenticate, async (req, res) => {
       .single();
 
     if (voteError) {
-      return res.status(404).json({ message: "Vote non trouvé" });
+      return res.status(404).json({ message: "Vote not found" });
     }
 
-    // Supprimer le vote
+    // Delete the vote
     const { error: deleteError } = await supabase
       .from("votes")
       .delete()
@@ -128,7 +132,7 @@ router.delete("/:projectId", authenticate, async (req, res) => {
 
     if (deleteError) throw deleteError;
 
-    // Récupérer les stats de vote mises à jour
+    // Retrieve updated vote stats
     const { data: updatedProject, error: statsError } = await supabase
       .from("projects")
       .select("votes_for, votes_against")
@@ -138,7 +142,7 @@ router.delete("/:projectId", authenticate, async (req, res) => {
     if (statsError) throw statsError;
 
     res.json({
-      message: "Vote annulé",
+      message: "Vote canceled",
       stats: {
         votesFor: updatedProject.votes_for,
         votesAgainst: updatedProject.votes_against,
@@ -147,12 +151,12 @@ router.delete("/:projectId", authenticate, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Erreur lors de l'annulation du vote:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while canceling the vote:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Obtenir les votes de l'utilisateur connecté
+// Get votes of the logged-in user
 router.get("/me", authenticate, async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -169,7 +173,7 @@ router.get("/me", authenticate, async (req, res) => {
 
     if (error) throw error;
 
-    // Formater la réponse
+    // Format the response
     const formattedVotes = data.map((vote) => ({
       id: vote.id,
       projectId: vote.project.id,
@@ -180,12 +184,12 @@ router.get("/me", authenticate, async (req, res) => {
 
     res.json(formattedVotes);
   } catch (error) {
-    console.error("Erreur lors de la récupération des votes:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while retrieving votes:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
-// Vérifier si l'utilisateur a voté pour un projet spécifique
+// Check if the user has voted for a specific project
 router.get("/:projectId/check", authenticate, async (req, res) => {
   try {
     const { projectId } = req.params;
@@ -206,8 +210,8 @@ router.get("/:projectId/check", authenticate, async (req, res) => {
       voteType: data ? data.vote_type : null,
     });
   } catch (error) {
-    console.error("Erreur lors de la vérification du vote:", error);
-    res.status(500).json({ message: "Erreur serveur" });
+    console.error("Error while checking the vote:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 

@@ -29,6 +29,8 @@ CREATE TABLE projects (
   twitter TEXT,
   discord TEXT,
   github TEXT,
+  logo_url TEXT,
+  banner_url TEXT,
   status TEXT CHECK (status IN ('PENDING', 'TRUSTABLE', 'SCAM', 'RUG')) DEFAULT 'PENDING',
   votes_for INTEGER DEFAULT 0,
   votes_against INTEGER DEFAULT 0,
@@ -50,6 +52,7 @@ CREATE TABLE votes (
   project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
   vote_type TEXT CHECK (vote_type IN ('FOR', 'AGAINST')) NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_modified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, project_id)
 );
 
