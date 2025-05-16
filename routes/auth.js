@@ -177,8 +177,8 @@ router.get("/twitter/callback", async (req, res) => {
     const body = new URLSearchParams({
       code,
       grant_type: "authorization_code",
-      client_id: process.env.TWITTER_CLIENT_ID,
-      redirect_uri: process.env.TWITTER_REDIRECT_URI,
+      client_id: TWITTER_CLIENT_ID,
+      redirect_uri: TWITTER_CALLBACK_URL,
       code_verifier: "challenge",
     });
 
