@@ -170,9 +170,11 @@ router.get("/twitter/callback", async (req, res) => {
   try {
     const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET;
     const TWITTER_RETURN_TO = process.env.TWITTER_RETURN_TO;
-    const { code } = req.query;
+    const { code, state } = req.query;
 
-    if (!code) return res.status(400).json({ message: "Missing code" });
+    if (!code || !state) {
+      return res.status(400).json({ message: "Missing code or state" });
+    }
 
     const body = new URLSearchParams({
       code,
@@ -221,8 +223,7 @@ router.get("/twitter/callback", async (req, res) => {
     const userData = await userRes.json();
     const twitterUser = userData.data;
 
-    const jwtToken = req.cookies.token;
-    const decoded = jwt.verify(jwtToken, process.env.JWT_SECRET);
+    const decoded = jwt.verify(state, process.env.JWT_SECRET);
     const userId = decoded.id;
 
     // Save Twitter data and tokens into Supabase
