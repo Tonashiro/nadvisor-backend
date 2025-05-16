@@ -58,6 +58,7 @@ CREATE TABLE votes (
   vote_type TEXT CHECK (vote_type IN ('FOR', 'AGAINST')) NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   last_modified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_role TEXT CHECK (user_role IN ('MON', 'OG', 'NAD', 'FULL_ACCESS')) DEFAULT NULL,
   UNIQUE(user_id, project_id)
 );
 
