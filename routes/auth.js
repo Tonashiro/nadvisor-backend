@@ -279,6 +279,8 @@ router.get("/me", authenticate, (req, res) => {
   res.json({
     id: req.user.id,
     discord_id: req.user.discord_id,
+    twitter_id: req.user.twitter_id,
+    twitter_username: req.user.twitter_username,
     username: req.user.username,
     avatar: req.user.avatar,
     is_admin: req.user.is_admin,
