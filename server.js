@@ -12,6 +12,7 @@ const projectsRoutes = require("./routes/projects");
 const votesRoutes = require("./routes/votes");
 const healthRoute = require("./routes/health");
 const uploadRoutes = require("./routes/uploads");
+const statsRoutes = require("./routes/stats");
 
 // Application initialization
 const app = express();
@@ -30,6 +31,7 @@ app.use("/api/projects", projectsRoutes);
 app.use("/api/votes", votesRoutes);
 app.use("/api/health", healthRoute);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/stats", statsRoutes);
 
 // Root route
 app.get("/", (req, res) => {
@@ -57,6 +59,22 @@ app.get("/api/docs", (req, res) => {
         method: "GET",
         description: "Get information about the logged-in user",
       },
+      {
+        path: "/api/auth/twitter",
+        method: "GET",
+        description: "Get the Twitter authentication URL",
+      },
+      {
+        path: "/api/auth/twitter/callback",
+        method: "GET",
+        description: "Callback for Twitter authentication",
+      },
+      {
+        path: "/api/auth/twitter/tokens",
+        method: "GET",
+        description: "Get the Twitter tokens of the logged-in user",
+      },
+
       {
         path: "/api/projects",
         method: "GET",
@@ -101,6 +119,11 @@ app.get("/api/docs", (req, res) => {
         path: "/api/health",
         method: "GET",
         description: "Database health check",
+      },
+      {
+        path: "/api/stats",
+        method: "GET",
+        description: "Platform statistics",
       },
     ],
   });

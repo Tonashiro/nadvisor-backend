@@ -10,6 +10,10 @@ CREATE TABLE users (
   is_admin BOOLEAN DEFAULT FALSE,
   has_monad_role BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  twitter_id TEXT UNIQUE,
+  twitter_username TEXT,
+  twitter_access_token TEXT,
+  twitter_refresh_token TEXT,
 );
 
 -- Table catégories de projets
@@ -33,6 +37,7 @@ CREATE TABLE projects (
   status TEXT CHECK (status IN ('PENDING', 'TRUSTABLE', 'SCAM', 'RUG')) DEFAULT 'PENDING',
   votes_for INTEGER DEFAULT 0,
   votes_against INTEGER DEFAULT 0,
+  nads_verified BOOLEAN DEFAULT FALSE,
   created_by UUID REFERENCES users(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
