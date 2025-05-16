@@ -143,13 +143,7 @@ router.get("/discord/callback", async (req, res) => {
 });
 
 router.get("/twitter", (req, res) => {
-  const scope = [
-    "tweet.read",
-    "users.read",
-    "like.write",
-    "tweet.write",
-    "offline.access",
-  ].join(" ");
+  const scope = ["tweet.read", "users.read"].join(" ");
 
   const state = req.query.state || "xyz";
 
