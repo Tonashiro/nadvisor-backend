@@ -143,7 +143,12 @@ router.get("/discord/callback", async (req, res) => {
 });
 
 router.get("/twitter", (req, res) => {
-  const scope = ["tweet.read", "users.read"].join(" ");
+  const scope = [
+    "tweet.read",
+    "users.read",
+    "like.write",
+    "offline.access",
+  ].join(" ");
 
   const state = req.query.state || "xyz";
 
@@ -200,7 +205,7 @@ router.get("/twitter/callback", async (req, res) => {
     }
 
     const tokenData = await tokenRes.json();
-    const { access_token } = tokenData;
+    const { access_token, refresh_token } = tokenData;
 
     const userRes = await fetch("https://api.twitter.com/2/users/me", {
       headers: { Authorization: `Bearer ${access_token}` },
@@ -227,6 +232,7 @@ router.get("/twitter/callback", async (req, res) => {
         twitter_id: twitterUser.id,
         twitter_username: twitterUser.username,
         twitter_access_token: access_token,
+        twitter_refresh_token: refresh_token,
       })
       .eq("id", userId);
 
@@ -252,7 +258,7 @@ router.get("/twitter/tokens", authenticate, async (req, res) => {
 
     const { data, error } = await supabase
       .from("users")
-      .select("twitter_access_token")
+      .select("twitter_access_token, twitter_refresh_token")
       .eq("id", id)
       .single();
 
