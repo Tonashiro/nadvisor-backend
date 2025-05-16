@@ -8,8 +8,9 @@ CREATE TABLE users (
   username TEXT NOT NULL,
   avatar TEXT,
   is_admin BOOLEAN DEFAULT FALSE,
-  has_monad_role BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  can_vote BOOLEAN DEFAULT FALSE,
+  discord_role TEXT CHECK (discord_role IN ('MON', 'OG', 'NAD', 'FULL_ACCESS')) DEFAULT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   twitter_id TEXT UNIQUE,
   twitter_username TEXT,
   twitter_access_token TEXT,

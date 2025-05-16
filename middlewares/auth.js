@@ -44,8 +44,8 @@ exports.isAdmin = (req, res, next) => {
 
 // Check if the user can vote (MON role)
 exports.canVote = (req, res, next) => {
-  if (!req.user.has_monad_role) {
-    return res.status(403).json({ message: "MON role required to vote" });
+  if (!req.user.can_vote) {
+    return res.status(403).json({ message: "At least FullAccess role required" });
   }
   next();
 };

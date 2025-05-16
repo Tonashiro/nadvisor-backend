@@ -29,7 +29,7 @@ router.get("/discord/callback", async (req, res) => {
       return res.status(400).json({ message: "Authorization code required" });
     }
 
-    // Échanger le code contre un token Discord
+    // Exchange the code for a Discord token
     const tokenResponse = await axios.post(
       "https://discord.com/api/oauth2/token",
       new URLSearchParams({
@@ -49,15 +49,15 @@ router.get("/discord/callback", async (req, res) => {
 
     const { access_token } = tokenResponse.data;
 
-    // Récupérer les infos de l'utilisateur Discord
+    // Fetch user info from Discord
     const userResponse = await axios.get("https://discord.com/api/users/@me", {
       headers: {
         Authorization: `Bearer ${access_token}`,
       },
     });
 
-    // Récupérer le statut du membre dans le serveur Monad
-    let hasMonadRole = false;
+    // Fetch user's roles in the Monad server
+    let userRoles = [];
     try {
       const memberResponse = await axios.get(
         `https://discord.com/api/users/@me/guilds/${process.env.MONAD_SERVER_ID}/member`,
@@ -68,20 +68,45 @@ router.get("/discord/callback", async (req, res) => {
         }
       );
 
-      // Vérifier si l'utilisateur a le rôle MON
-      hasMonadRole = memberResponse.data.roles.includes(
-        process.env.MONAD_ROLE_ID
-      );
+      userRoles = memberResponse.data.roles;
     } catch (error) {
       console.log("User not a member of the Monad server or Discord API error");
     }
 
-    // Vérifier si c'est un admin
+    // Define role priorities
+    const rolePriorities = {
+      [process.env.MONAD_MON_ROLE_ID]: "MON",
+      [process.env.MONAD_OG_ROLE_ID]: "OG",
+      [process.env.MONAD_NADS_ROLE_ID]: "NAD",
+      [process.env.MONAD_LOCALNADS_ROLE_ID]: "NAD",
+      [process.env.MONAD_FULL_ACCESS_ROLE_ID]: "FULL_ACCESS",
+    };
+
+    // Determine the highest role and if the user can vote
+    let highestRole = null;
+    let canVote = false;
+
+    for (const roleId of userRoles) {
+      if (rolePriorities[roleId]) {
+        canVote = true; // User has at least one valid role
+        if (
+          !highestRole ||
+          Object.keys(rolePriorities).indexOf(roleId) <
+            Object.keys(rolePriorities).indexOf(highestRole)
+        ) {
+          highestRole = roleId;
+        }
+      }
+    }
+
+    const discordRole = highestRole ? rolePriorities[highestRole] : null;
+
+    // Check if the user is an admin
     const isAdmin = process.env.ADMIN_DISCORD_IDS.split(",").includes(
       userResponse.data.id
     );
 
-    // Rechercher ou créer l'utilisateur dans Supabase
+    // Find or create the user in Supabase
     const { data: existingUser } = await supabase
       .from("users")
       .select("*")
@@ -91,14 +116,15 @@ router.get("/discord/callback", async (req, res) => {
     let user;
 
     if (existingUser) {
-      // Mettre à jour l'utilisateur existant
+      // Update the existing user
       const { data: updatedUser } = await supabase
         .from("users")
         .update({
           username: userResponse.data.username,
           avatar: userResponse.data.avatar,
           is_admin: isAdmin,
-          has_monad_role: hasMonadRole,
+          can_vote: canVote,
+          discord_role: discordRole,
         })
         .eq("discord_id", userResponse.data.id)
         .select()
@@ -106,7 +132,7 @@ router.get("/discord/callback", async (req, res) => {
 
       user = updatedUser;
     } else {
-      // Créer un nouvel utilisateur
+      // Create a new user
       const { data: newUser } = await supabase
         .from("users")
         .insert({
@@ -114,7 +140,8 @@ router.get("/discord/callback", async (req, res) => {
           username: userResponse.data.username,
           avatar: userResponse.data.avatar,
           is_admin: isAdmin,
-          has_monad_role: hasMonadRole,
+          can_vote: canVote,
+          discord_role: discordRole,
         })
         .select()
         .single();
@@ -122,13 +149,14 @@ router.get("/discord/callback", async (req, res) => {
       user = newUser;
     }
 
-    // Générer JWT pour l'authentification
+    // Generate a JWT for authentication
     const token = jwt.sign(
       {
         id: user.id,
         discord_id: user.discord_id,
         is_admin: user.is_admin,
-        has_monad_role: user.has_monad_role,
+        can_vote: user.can_vote,
+        discord_role: user.discord_role,
       },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
@@ -284,7 +312,8 @@ router.get("/me", authenticate, (req, res) => {
     username: req.user.username,
     avatar: req.user.avatar,
     is_admin: req.user.is_admin,
-    has_monad_role: req.user.has_monad_role,
+    can_vote: req.user.canVote,
+    discord_role: req.user.discordRole,
   });
 });
 
