@@ -35,7 +35,8 @@ router.get("/", async (req, res) => {
     let query = supabase.from("projects").select(`
         *,
         created_by:users(username, avatar),
-        categories:project_categories(category:categories(id, name))
+        categories:project_categories(category:categories(id, name)),
+        votes_breakdown:project_votes_by_role(role, votes_for, votes_against)
       `);
 
     // Filter by status if specified
@@ -48,7 +49,7 @@ router.get("/", async (req, res) => {
       .order(sort, { ascending: order === "asc" })
       .range((page - 1) * limit, page * limit - 1);
 
-    const { data, error, count } = await query;
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -72,6 +73,7 @@ router.get("/", async (req, res) => {
           }
         : null,
       categories: project.categories.map((c) => c.category),
+      votes_breakdown: project.votes_breakdown || [], // Include votes breakdown
     }));
 
     // Get the total count for pagination

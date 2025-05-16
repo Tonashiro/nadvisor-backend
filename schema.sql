@@ -61,6 +61,15 @@ CREATE TABLE votes (
   UNIQUE(user_id, project_id)
 );
 
+-- Table to store votes breakdown by role for each project
+CREATE TABLE project_votes_by_role (
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  role TEXT CHECK (role IN ('MON', 'OG', 'NAD', 'FULL_ACCESS')) NOT NULL,
+  votes_for INTEGER DEFAULT 0,
+  votes_against INTEGER DEFAULT 0,
+  PRIMARY KEY (project_id, role)
+);
+
 -- Insérer quelques catégories de base
 INSERT INTO categories (name, description) VALUES
 ('DeFi', 'Decentralized Finance'),

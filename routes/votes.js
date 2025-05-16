@@ -10,6 +10,7 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
     const { projectId } = req.params;
     const { voteType } = req.body;
     const userId = req.user.id;
+    const userRole = req.user.discord_role;
 
     // Validation
     if (!voteType || !["FOR", "AGAINST"].includes(voteType)) {
@@ -63,6 +64,15 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
         .single();
 
       if (error) throw error;
+
+      // Update the breakdown table
+      await updateVotesByRole(
+        projectId,
+        userRole,
+        existingVote.vote_type,
+        voteType
+      );
+
       result = { data, updated: true };
     } else {
       // Create a new vote
@@ -78,6 +88,10 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
         .single();
 
       if (error) throw error;
+
+      // Update the breakdown table
+      await updateVotesByRole(projectId, userRole, null, voteType);
+
       result = { data, created: true };
     }
 
@@ -214,5 +228,56 @@ router.get("/:projectId/check", authenticate, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// Helper function to update the votes breakdown by role
+async function updateVotesByRole(projectId, role, oldVoteType, newVoteType) {
+  try {
+    // Check if an entry for this role already exists
+    const { data: roleData, error: roleError } = await supabase
+      .from("project_votes_by_role")
+      .select("*")
+      .eq("project_id", projectId)
+      .eq("role", role)
+      .single();
+
+    if (roleError && roleError.code !== "PGRST116") {
+      throw roleError;
+    }
+
+    if (roleData) {
+      // Update the existing entry
+      const updates = {};
+
+      if (oldVoteType === "FOR") updates.votes_for = roleData.votes_for - 1;
+      if (oldVoteType === "AGAINST")
+        updates.votes_against = roleData.votes_against - 1;
+
+      if (newVoteType === "FOR")
+        updates.votes_for = (updates.votes_for || roleData.votes_for) + 1;
+      if (newVoteType === "AGAINST")
+        updates.votes_against =
+          (updates.votes_against || roleData.votes_against) + 1;
+
+      await supabase
+        .from("project_votes_by_role")
+        .update(updates)
+        .eq("project_id", projectId)
+        .eq("role", role);
+    } else {
+      // Create a new entry
+      const newEntry = {
+        project_id: projectId,
+        role,
+        votes_for: newVoteType === "FOR" ? 1 : 0,
+        votes_against: newVoteType === "AGAINST" ? 1 : 0,
+      };
+
+      await supabase.from("project_votes_by_role").insert(newEntry);
+    }
+  } catch (error) {
+    console.error("Error while updating votes by role:", error);
+    throw error;
+  }
+}
 
 module.exports = router;
