@@ -6,6 +6,9 @@ const jwt = require("jsonwebtoken");
 const supabase = require("../config/supabase");
 const { authenticate } = require("../middlewares/auth");
 
+const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID;
+const TWITTER_CALLBACK_URL = process.env.TWITTER_CALLBACK_URL;
+
 router.get("/discord", (req, res) => {
   const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
   const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
@@ -153,8 +156,8 @@ router.get("/twitter", (req, res) => {
   const url = new URL("https://twitter.com/i/oauth2/authorize");
 
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", process.env.TWITTER_CLIENT_ID);
-  url.searchParams.set("redirect_uri", process.env.TWITTER_REDIRECT_URI);
+  url.searchParams.set("client_id", TWITTER_CLIENT_ID);
+  url.searchParams.set("redirect_uri", TWITTER_CALLBACK_URL);
   url.searchParams.set("scope", scope);
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", "challenge");
@@ -165,7 +168,10 @@ router.get("/twitter", (req, res) => {
 
 router.get("/twitter/callback", async (req, res) => {
   try {
+    const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET;
+    const TWITTER_RETURN_TO = process.env.TWITTER_RETURN_TO;
     const { code } = req.query;
+
     if (!code) return res.status(400).json({ message: "Missing code" });
 
     const body = new URLSearchParams({
@@ -238,7 +244,7 @@ router.get("/twitter/callback", async (req, res) => {
         .json({ message: "Failed to link Twitter account" });
     }
 
-    res.redirect(`${process.env.TWITTER_RETURN_TO}?twitter_connect=true`);
+    res.redirect(`${TWITTER_RETURN_TO}?twitter_connect=true`);
   } catch (err) {
     console.error("Twitter Callback Error:", err);
 
