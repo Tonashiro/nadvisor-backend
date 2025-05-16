@@ -13,7 +13,6 @@ CREATE TABLE users (
   twitter_id TEXT UNIQUE,
   twitter_username TEXT,
   twitter_access_token TEXT,
-  twitter_refresh_token TEXT,
 );
 
 -- Table catégories de projets
