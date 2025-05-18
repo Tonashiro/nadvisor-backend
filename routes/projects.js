@@ -151,7 +151,6 @@ router.post("/", authenticate, isAdmin, async (req, res) => {
       discord,
       logo_url,
       banner_url,
-      github,
       categories,
       status = "PENDING",
     } = req.body;
@@ -159,6 +158,31 @@ router.post("/", authenticate, isAdmin, async (req, res) => {
     // Basic validation
     if (!name || !description) {
       return res.status(400).json({ message: "Name and description required" });
+    }
+
+    // Validate categories array
+    if (
+      categories &&
+      (!Array.isArray(categories) || categories.some((id) => !id))
+    ) {
+      return res.status(400).json({ message: "Invalid categories array" });
+    }
+
+    // Check if all category IDs exist in the categories table
+    const { data: validCategories, error: categoryError } = await supabase
+      .from("categories")
+      .select("id")
+      .in("id", categories);
+
+    if (categoryError) {
+      console.error("Error while validating categories:", categoryError);
+      return res.status(500).json({ message: "Failed to validate categories" });
+    }
+
+    if (validCategories.length !== categories.length) {
+      return res
+        .status(400)
+        .json({ message: "One or more category IDs are invalid" });
     }
 
     // Insert the project
@@ -170,7 +194,6 @@ router.post("/", authenticate, isAdmin, async (req, res) => {
         website,
         twitter,
         discord,
-        github,
         status,
         logo_url,
         banner_url,
@@ -189,19 +212,19 @@ router.post("/", authenticate, isAdmin, async (req, res) => {
       throw error;
     }
 
-    // Add categories if specified
-    if (categories && categories.length > 0) {
-      const categoryLinks = categories.map((categoryId) => ({
-        project_id: project.id,
-        category_id: categoryId,
-      }));
+    // Link the project to the categories
+    const categoryLinks = categories.map((categoryId) => ({
+      project_id: project.id,
+      category_id: categoryId,
+    }));
 
-      const { error: categoryError } = await supabase
-        .from("project_categories")
-        .insert(categoryLinks);
+    const { error: categoryLinkError } = await supabase
+      .from("project_categories")
+      .insert(categoryLinks);
 
-      if (categoryError) throw categoryError;
-    }
+    if (categoryLinkError) throw categoryLinkError;
+
+    // Fetch the linked categories
     const { data: projectCategories, error: fetchError } = await supabase
       .from("project_categories")
       .select("category:categories(id, name, description)")
@@ -225,17 +248,22 @@ router.post("/", authenticate, isAdmin, async (req, res) => {
 router.put("/:id", authenticate, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      name,
-      description,
-      website,
-      twitter,
-      discord,
-      github,
-      categories,
-      status,
-    } = req.body;
+    const { name, description, website, twitter, discord, categories, status } =
+      req.body;
 
+    // Validate categories array
+    if (
+      categories &&
+      (!Array.isArray(categories) ||
+        categories.length < 1 ||
+        categories.length > 3)
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Categories must contain between 1 and 3 valid IDs" });
+    }
+
+    // Check if the project exists
     const { data: existingProject, error: checkError } = await supabase
       .from("projects")
       .select("id")
@@ -255,7 +283,6 @@ router.put("/:id", authenticate, isAdmin, async (req, res) => {
         website,
         twitter,
         discord,
-        github,
         status,
       })
       .eq("id", id)
@@ -273,25 +300,42 @@ router.put("/:id", authenticate, isAdmin, async (req, res) => {
 
     // Update categories if specified
     if (categories) {
+      // Check if all category IDs exist in the categories table
+      const { data: validCategories, error: categoryError } = await supabase
+        .from("categories")
+        .select("id")
+        .in("id", categories);
+
+      if (categoryError) {
+        console.error("Error while validating categories:", categoryError);
+        return res
+          .status(500)
+          .json({ message: "Failed to validate categories" });
+      }
+
+      if (validCategories.length !== categories.length) {
+        return res
+          .status(400)
+          .json({ message: "One or more category IDs are invalid" });
+      }
+
       // Delete existing links
       await supabase.from("project_categories").delete().eq("project_id", id);
 
       // Add new links
-      if (categories.length > 0) {
-        const categoryLinks = categories.map((categoryId) => ({
-          project_id: id,
-          category_id: categoryId,
-        }));
+      const categoryLinks = categories.map((categoryId) => ({
+        project_id: id,
+        category_id: categoryId,
+      }));
 
-        const { error: categoryError } = await supabase
-          .from("project_categories")
-          .insert(categoryLinks);
+      const { error: categoryLinkError } = await supabase
+        .from("project_categories")
+        .insert(categoryLinks);
 
-        if (categoryError) throw categoryError;
-      }
+      if (categoryLinkError) throw categoryLinkError;
     }
 
-    // Retrieve categories associated with the project
+    // Fetch the linked categories
     const { data: projectCategories, error: fetchError } = await supabase
       .from("project_categories")
       .select("category:categories(id, name, description)")
@@ -344,7 +388,9 @@ router.post("/categories", authenticate, isAdmin, async (req, res) => {
 
     if (error) {
       if (error.code === "23505") {
-        return res.status(400).json({ message: "This category already exists" });
+        return res
+          .status(400)
+          .json({ message: "This category already exists" });
       }
       throw error;
     }
