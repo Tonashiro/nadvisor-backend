@@ -306,6 +306,7 @@ router.get("/twitter/tokens", authenticate, async (req, res) => {
 router.get("/me", authenticate, (req, res) => {
   res.json({
     id: req.user.id,
+    wallet_address: req.user.wallet_address,
     discord_id: req.user.discord_id,
     twitter_id: req.user.twitter_id,
     twitter_username: req.user.twitter_username,

@@ -13,6 +13,7 @@ const votesRoutes = require("./routes/votes");
 const healthRoute = require("./routes/health");
 const uploadRoutes = require("./routes/uploads");
 const statsRoutes = require("./routes/stats");
+const walletRoutes = require("./routes/wallet");
 
 // Application initialization
 const app = express();
@@ -32,6 +33,7 @@ app.use("/api/votes", votesRoutes);
 app.use("/api/health", healthRoute);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/stats", statsRoutes);
+app.use("/api/wallet", walletRoutes);
 
 // Root route
 app.get("/", (req, res) => {
@@ -124,6 +126,11 @@ app.get("/api/docs", (req, res) => {
         path: "/api/stats",
         method: "GET",
         description: "Platform statistics",
+      },
+      {
+        path: "/api/wallet",
+        method: "POST",
+        description: "User wallet address submission",
       },
     ],
   });
