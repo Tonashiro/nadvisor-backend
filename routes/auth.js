@@ -105,6 +105,14 @@ router.get("/discord/callback", async (req, res) => {
       [process.env.MONAD_FULL_ACCESS_ROLE_ID]: 4, // Lowest priority
     };
 
+    const roleNames = {
+      [process.env.MONAD_MON_ROLE_ID]: "MON",
+      [process.env.MONAD_OG_ROLE_ID]: "OG",
+      [process.env.MONAD_NADS_ROLE_ID]: "NAD",
+      [process.env.MONAD_LOCALNADS_ROLE_ID]: "NAD",
+      [process.env.MONAD_FULL_ACCESS_ROLE_ID]: "FULL_ACCESS",
+    };
+
     // Determine the highest role and if the user can vote
     let highestPriority = Infinity;
     let highestRole = null;
@@ -116,9 +124,7 @@ router.get("/discord/callback", async (req, res) => {
         canVote = true; // User has at least one valid role
         if (priority < highestPriority) {
           highestPriority = priority;
-          highestRole = Object.entries(rolePriorities).find(
-            ([key, value]) => value === priority
-          )[1];
+          highestRole = roleNames[roleId];
         }
 
         // Stop iterating if the highest-priority role ("MON") is found
