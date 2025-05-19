@@ -49,7 +49,6 @@ router.get("/discord/callback", async (req, res) => {
 
     const { access_token } = tokenResponse.data;
 
-    console.log("Discord access token:", access_token);
     // Fetch user info from Discord
     let userResponse;
     try {
@@ -88,9 +87,13 @@ router.get("/discord/callback", async (req, res) => {
       );
 
       userRoles = memberResponse.data.roles;
-      console.log("User roles in Monad server:", userRoles);
     } catch (error) {
-      console.log("User not a member of the Monad server or Discord API error");
+      console.error(
+        "Error fetching user roles from Monad server:",
+        error.response?.data || error.message
+      );
+      // Optionally, you can set userRoles to an empty array or handle as needed
+      userRoles = [];
     }
 
     // Define role priorities
@@ -113,9 +116,9 @@ router.get("/discord/callback", async (req, res) => {
         canVote = true; // User has at least one valid role
         if (priority < highestPriority) {
           highestPriority = priority;
-          highestRole = Object.keys(rolePriorities).find(
-            (key) => rolePriorities[key] === priority
-          );
+          highestRole = Object.entries(rolePriorities).find(
+            ([key, value]) => value === priority
+          )[1];
         }
 
         // Stop iterating if the highest-priority role ("MON") is found
@@ -127,8 +130,6 @@ router.get("/discord/callback", async (req, res) => {
 
     const discordRole = highestRole;
 
-    console.log("User response from Discord:", userResponse.data);
-    console.log("Discord highest role:", discordRole);
     // Check if the user is an admin
     const isAdmin = process.env.ADMIN_DISCORD_IDS.split(",").includes(
       userResponse.data.id
