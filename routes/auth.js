@@ -86,23 +86,7 @@ router.get("/discord/callback", async (req, res) => {
         }
       );
 
-      console.log("Member Response:", memberResponse.data.roles);
-      userRoles = [
-        "1072682201658970112",
-        "1234915103267094528",
-        "1245374937716363264",
-        "1194380690091954276",
-        "1051562453495971941",
-        "1220059615308550245",
-        "1038728318666682378",
-        "1046330093569593418",
-        "1037873237159321612",
-        "1148702047751913482",
-        "1172573469108613130",
-        "1037205170397904956",
-        "1240738835264962612",
-        "1169377994268221500",
-      ];
+      userRoles = memberResponse.data.roles;
     } catch (error) {
       console.error(
         "Error fetching user roles from Monad server:",
