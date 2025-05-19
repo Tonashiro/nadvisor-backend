@@ -4,7 +4,7 @@ const router = express.Router();
 const supabase = require("../config/supabase");
 const { authenticate, canVote } = require("../middlewares/auth");
 
-// Vote for a project (requires MON role)
+// Vote for a project (requires at least FullAccess role)
 router.post("/:projectId", authenticate, canVote, async (req, res) => {
   try {
     const { projectId } = req.params;
@@ -20,7 +20,7 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
     }
 
     // Check if the project exists
-    const { data: project, error: projectError } = await supabase
+    const { error: projectError } = await supabase
       .from("projects")
       .select("id")
       .eq("id", projectId)
@@ -42,14 +42,46 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
       throw voteError;
     }
 
-    let result;
-
     if (existingVote) {
-      // If the vote is the same, do nothing
-      if (existingVote.vote_type === voteType && existingVote.user_role === userRole) {
-        return res
-          .status(400)
-          .json({ message: "You have already voted this way" });
+      // If the vote is the same, delete the existing vote
+      if (existingVote.vote_type === voteType) {
+        const { error: deleteError } = await supabase
+          .from("votes")
+          .delete()
+          .eq("id", existingVote.id);
+
+        if (deleteError) throw deleteError;
+
+        // Update the breakdown table
+        await updateVotesByRole(
+          projectId,
+          userRole,
+          existingVote.vote_type,
+          null,
+          existingVote.user_role
+        );
+
+        // Check and update project verification status
+        await checkAndUpdateNadsVerified(projectId);
+
+        // Retrieve updated vote stats
+        const { data: updatedProject, error: statsError } = await supabase
+          .from("projects")
+          .select("votes_for, votes_against")
+          .eq("id", projectId)
+          .single();
+
+        if (statsError) throw statsError;
+
+        return res.json({
+          message: "Vote removed successfully",
+          stats: {
+            votesFor: updatedProject.votes_for,
+            votesAgainst: updatedProject.votes_against,
+            total: updatedProject.votes_for + updatedProject.votes_against,
+            score: updatedProject.votes_for - updatedProject.votes_against,
+          },
+        });
       }
 
       // Otherwise, update the existing vote
@@ -57,7 +89,7 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
         .from("votes")
         .update({
           vote_type: voteType,
-          user_role: userRole, // Update the user's role in the vote record
+          user_role: userRole,
           last_modified_at: new Date(),
         })
         .eq("id", existingVote.id)
@@ -72,10 +104,31 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
         userRole,
         existingVote.vote_type,
         voteType,
-        existingVote.user_role // Pass the previous role
+        existingVote.user_role
       );
 
-      result = { data, updated: true };
+      // Check and update project verification status
+      await checkAndUpdateNadsVerified(projectId);
+
+      // Retrieve updated vote stats
+      const { data: updatedProject, error: statsError } = await supabase
+        .from("projects")
+        .select("votes_for, votes_against")
+        .eq("id", projectId)
+        .single();
+
+      if (statsError) throw statsError;
+
+      return res.json({
+        message: "Vote updated successfully",
+        vote: data,
+        stats: {
+          votesFor: updatedProject.votes_for,
+          votesAgainst: updatedProject.votes_against,
+          total: updatedProject.votes_for + updatedProject.votes_against,
+          score: updatedProject.votes_for - updatedProject.votes_against,
+        },
+      });
     } else {
       // Create a new vote
       const { data, error } = await supabase
@@ -84,7 +137,7 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
           user_id: userId,
           project_id: projectId,
           vote_type: voteType,
-          user_role: userRole, // Store the user's role in the vote record
+          user_role: userRole,
           last_modified_at: new Date(),
         })
         .select()
@@ -95,80 +148,31 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
       // Update the breakdown table
       await updateVotesByRole(projectId, userRole, null, voteType);
 
-      result = { data, created: true };
+      // Check and update project verification status
+      await checkAndUpdateNadsVerified(projectId);
+
+      // Retrieve updated vote stats
+      const { data: updatedProject, error: statsError } = await supabase
+        .from("projects")
+        .select("votes_for, votes_against")
+        .eq("id", projectId)
+        .single();
+
+      if (statsError) throw statsError;
+
+      return res.json({
+        message: "Vote recorded successfully",
+        vote: data,
+        stats: {
+          votesFor: updatedProject.votes_for,
+          votesAgainst: updatedProject.votes_against,
+          total: updatedProject.votes_for + updatedProject.votes_against,
+          score: updatedProject.votes_for - updatedProject.votes_against,
+        },
+      });
     }
-
-    // Retrieve updated vote stats
-    const { data: updatedProject, error: statsError } = await supabase
-      .from("projects")
-      .select("votes_for, votes_against")
-      .eq("id", projectId)
-      .single();
-
-    if (statsError) throw statsError;
-
-    res.json({
-      message: result.updated ? "Vote updated" : "Vote recorded",
-      vote: result.data,
-      stats: {
-        votesFor: updatedProject.votes_for,
-        votesAgainst: updatedProject.votes_against,
-        total: updatedProject.votes_for + updatedProject.votes_against,
-        score: updatedProject.votes_for - updatedProject.votes_against,
-      },
-    });
   } catch (error) {
     console.error("Error while voting:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Cancel a vote
-router.delete("/:projectId", authenticate, async (req, res) => {
-  try {
-    const { projectId } = req.params;
-    const userId = req.user.id;
-
-    // Check if the vote exists
-    const { data: vote, error: voteError } = await supabase
-      .from("votes")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("project_id", projectId)
-      .single();
-
-    if (voteError) {
-      return res.status(404).json({ message: "Vote not found" });
-    }
-
-    // Delete the vote
-    const { error: deleteError } = await supabase
-      .from("votes")
-      .delete()
-      .eq("id", vote.id);
-
-    if (deleteError) throw deleteError;
-
-    // Retrieve updated vote stats
-    const { data: updatedProject, error: statsError } = await supabase
-      .from("projects")
-      .select("votes_for, votes_against")
-      .eq("id", projectId)
-      .single();
-
-    if (statsError) throw statsError;
-
-    res.json({
-      message: "Vote canceled",
-      stats: {
-        votesFor: updatedProject.votes_for,
-        votesAgainst: updatedProject.votes_against,
-        total: updatedProject.votes_for + updatedProject.votes_against,
-        score: updatedProject.votes_for - updatedProject.votes_against,
-      },
-    });
-  } catch (error) {
-    console.error("Error while canceling the vote:", error);
     res.status(500).json({ message: "Server error" });
   }
 });
@@ -233,16 +237,23 @@ router.get("/:projectId/check", authenticate, async (req, res) => {
 });
 
 // Helper function to update the votes breakdown by role
-async function updateVotesByRole(projectId, currentRole, oldVoteType, newVoteType, previousRole = null) {
+async function updateVotesByRole(
+  projectId,
+  currentRole,
+  oldVoteType,
+  newVoteType,
+  previousRole = null
+) {
   try {
     // If the user's role has changed, decrement the vote from the previous role
     if (previousRole && previousRole !== currentRole) {
-      const { data: previousRoleData, error: previousRoleError } = await supabase
-        .from("project_votes_by_role")
-        .select("*")
-        .eq("project_id", projectId)
-        .eq("role", previousRole)
-        .single();
+      const { data: previousRoleData, error: previousRoleError } =
+        await supabase
+          .from("project_votes_by_role")
+          .select("*")
+          .eq("project_id", projectId)
+          .eq("role", previousRole)
+          .single();
 
       if (previousRoleError && previousRoleError.code !== "PGRST116") {
         throw previousRoleError;
@@ -250,8 +261,10 @@ async function updateVotesByRole(projectId, currentRole, oldVoteType, newVoteTyp
 
       if (previousRoleData) {
         const updates = {};
-        if (oldVoteType === "FOR") updates.votes_for = previousRoleData.votes_for - 1;
-        if (oldVoteType === "AGAINST") updates.votes_against = previousRoleData.votes_against - 1;
+        if (oldVoteType === "FOR")
+          updates.votes_for = previousRoleData.votes_for - 1;
+        if (oldVoteType === "AGAINST")
+          updates.votes_against = previousRoleData.votes_against - 1;
 
         await supabase
           .from("project_votes_by_role")
@@ -278,10 +291,14 @@ async function updateVotesByRole(projectId, currentRole, oldVoteType, newVoteTyp
       const updates = {};
 
       if (oldVoteType === "FOR") updates.votes_for = roleData.votes_for - 1;
-      if (oldVoteType === "AGAINST") updates.votes_against = roleData.votes_against - 1;
+      if (oldVoteType === "AGAINST")
+        updates.votes_against = roleData.votes_against - 1;
 
-      if (newVoteType === "FOR") updates.votes_for = (updates.votes_for || roleData.votes_for) + 1;
-      if (newVoteType === "AGAINST") updates.votes_against = (updates.votes_against || roleData.votes_against) + 1;
+      if (newVoteType === "FOR")
+        updates.votes_for = (updates.votes_for || roleData.votes_for) + 1;
+      if (newVoteType === "AGAINST")
+        updates.votes_against =
+          (updates.votes_against || roleData.votes_against) + 1;
 
       await supabase
         .from("project_votes_by_role")
@@ -301,6 +318,55 @@ async function updateVotesByRole(projectId, currentRole, oldVoteType, newVoteTyp
     }
   } catch (error) {
     console.error("Error while updating votes by role:", error);
+    throw error;
+  }
+}
+
+async function checkAndUpdateNadsVerified(projectId) {
+  try {
+    const { data: votesByRole, error: votesError } = await supabase
+      .from("project_votes_by_role")
+      .select("role, votes_for, votes_against")
+      .eq("project_id", projectId);
+
+    if (votesError) {
+      console.error("Error fetching votes breakdown:", votesError);
+      throw votesError;
+    }
+
+    const relevantRoles = ["NAD", "OG", "MON"];
+    let totalVotes = 0;
+    let totalForVotes = 0;
+
+    votesByRole.forEach((vote) => {
+      if (relevantRoles.includes(vote.role)) {
+        totalVotes += vote.votes_for + vote.votes_against;
+        totalForVotes += vote.votes_for;
+      }
+    });
+
+    // Check if the project meets the criteria
+    const isVerified = totalVotes >= 100 && totalForVotes / totalVotes >= 0.8;
+
+    // Update the project with the new verification status
+    const { error: updateError } = await supabase
+      .from("projects")
+      .update({
+        nads_verified: isVerified,
+        nads_verified_at: isVerified ? new Date() : null,
+      })
+      .eq("id", projectId);
+
+    if (updateError) {
+      console.error("Error updating project verification status:", updateError);
+      throw updateError;
+    }
+
+    console.log(
+      `Project ${projectId} verification status updated: ${isVerified}`
+    );
+  } catch (error) {
+    console.error("Error in checkAndUpdateNadsVerified:", error);
     throw error;
   }
 }
