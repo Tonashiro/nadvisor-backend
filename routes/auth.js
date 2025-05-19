@@ -9,6 +9,62 @@ const { authenticate } = require("../middlewares/auth");
 const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID;
 const TWITTER_CALLBACK_URL = process.env.TWITTER_CALLBACK_URL;
 
+// Helper function to fetch user info from Discord
+async function fetchDiscordUserInfo(accessToken) {
+  try {
+    const response = await axios.get("https://discord.com/api/users/@me", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return response.data;
+  } catch (error) {
+    console.error(
+      "Error fetching user info from Discord:",
+      error.response?.data || error.message
+    );
+    throw new Error("Failed to fetch user info from Discord");
+  }
+}
+
+// Helper function to fetch user roles from the Monad server
+async function fetchUserRoles(accessToken) {
+  try {
+    const response = await axios.get(
+      `https://discord.com/api/users/@me/guilds/${process.env.MONAD_SERVER_ID}/member`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    return response.data.roles;
+  } catch (error) {
+    console.error(
+      "Error fetching user roles from Monad server:",
+      error.response?.data || error.message
+    );
+    return [];
+  }
+}
+
+// Helper function to determine the highest role and voting eligibility
+function determineHighestRoleAndVoting(userRoles, rolePriorities, roleNames) {
+  let highestPriority = Infinity;
+  let highestRole = null;
+  let canVote = false;
+
+  for (const roleId of userRoles) {
+    if (rolePriorities[roleId] !== undefined) {
+      const priority = rolePriorities[roleId];
+      if (priority < highestPriority) {
+        highestPriority = priority;
+        highestRole = roleNames[roleId];
+      }
+      canVote = true; // User can vote if they have any mapped role
+      if (priority === 1) break; // Stop if MON role is found
+    }
+  }
+
+  return { highestRole, canVote };
+}
+
 router.get("/discord", (req, res) => {
   const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
   const REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
@@ -38,71 +94,29 @@ router.get("/discord/callback", async (req, res) => {
         grant_type: "authorization_code",
         code,
         redirect_uri: process.env.DISCORD_REDIRECT_URI,
-        return_to: process.env.DISCORD_RETURN_TO,
       }),
-      {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      }
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
     );
 
-    const { access_token } = tokenResponse.data;
+    const accessToken = tokenResponse.data.access_token;
 
-    // Fetch user info from Discord
-    let userResponse;
-    try {
-      userResponse = await axios.get("https://discord.com/api/users/@me", {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      });
-    } catch (error) {
-      console.error(
-        "Error fetching user info from Discord:",
-        error.response?.data || error.message
-      );
-      return res
-        .status(500)
-        .json({ message: "Failed to fetch user info from Discord" });
-    }
+    // Fetch user info and roles
+    const userInfo = await fetchDiscordUserInfo(accessToken);
+    const userRoles = await fetchUserRoles(accessToken);
 
-    if (!userResponse || !userResponse.data || !userResponse.data.id) {
-      console.error("Invalid user response from Discord:", userResponse?.data);
+    if (!userInfo?.id) {
       return res
         .status(500)
         .json({ message: "Invalid user response from Discord" });
     }
 
-    // Fetch user's roles in the Monad server
-    let userRoles = [];
-    try {
-      const memberResponse = await axios.get(
-        `https://discord.com/api/users/@me/guilds/${process.env.MONAD_SERVER_ID}/member`,
-        {
-          headers: {
-            Authorization: `Bearer ${access_token}`,
-          },
-        }
-      );
-
-      userRoles = memberResponse.data.roles;
-    } catch (error) {
-      console.error(
-        "Error fetching user roles from Monad server:",
-        error.response?.data || error.message
-      );
-      // Optionally, you can set userRoles to an empty array or handle as needed
-      userRoles = [];
-    }
-
-    // Define role priorities
+    // Define role priorities and names
     const rolePriorities = {
-      [process.env.MONAD_MON_ROLE_ID]: 1, // Highest priority
+      [process.env.MONAD_MON_ROLE_ID]: 1,
       [process.env.MONAD_OG_ROLE_ID]: 2,
       [process.env.MONAD_NADS_ROLE_ID]: 3,
       [process.env.MONAD_LOCALNADS_ROLE_ID]: 3,
-      [process.env.MONAD_FULL_ACCESS_ROLE_ID]: 4, // Lowest priority
+      [process.env.MONAD_FULL_ACCESS_ROLE_ID]: 4,
     };
 
     const roleNames = {
@@ -113,54 +127,37 @@ router.get("/discord/callback", async (req, res) => {
       [process.env.MONAD_FULL_ACCESS_ROLE_ID]: "FULL_ACCESS",
     };
 
-    // Determine the highest role and if the user can vote
-    let highestPriority = Infinity;
-    let highestRole = null;
-    let canVote = false;
-
-    for (const roleId of userRoles) {
-      if (rolePriorities.hasOwnProperty(roleId)) {
-        const priority = rolePriorities[roleId];
-        if (priority < highestPriority) {
-          highestPriority = priority;
-          highestRole = roleNames[roleId];
-        }
-
-        // Stop iterating if the highest-priority role ("MON") is found
-        if (priority === 1) {
-          break;
-        }
-      }
-    }
-
-    const discordRole = highestRole;
+    const { highestRole: discordRole, canVote } = determineHighestRoleAndVoting(
+      userRoles,
+      rolePriorities,
+      roleNames
+    );
 
     // Check if the user is an admin
     const isAdmin = process.env.ADMIN_DISCORD_IDS.split(",").includes(
-      userResponse.data.id
+      userInfo.id
     );
 
     // Find or create the user in Supabase
     const { data: existingUser } = await supabase
       .from("users")
       .select("*")
-      .eq("discord_id", userResponse.data.id)
+      .eq("discord_id", userInfo.id)
       .maybeSingle();
 
     let user;
 
     if (existingUser) {
-      // Update the existing user
       const { data: updatedUser, error: updateError } = await supabase
         .from("users")
         .update({
-          username: userResponse.data.username,
-          avatar: userResponse.data.avatar,
+          username: userInfo.username,
+          avatar: userInfo.avatar,
           is_admin: isAdmin,
           can_vote: canVote,
           discord_role: discordRole,
         })
-        .eq("discord_id", userResponse.data.id)
+        .eq("discord_id", userInfo.id)
         .select()
         .single();
 
@@ -173,13 +170,12 @@ router.get("/discord/callback", async (req, res) => {
 
       user = updatedUser;
     } else {
-      // Create a new user
       const { data: newUser, error: insertError } = await supabase
         .from("users")
         .insert({
-          discord_id: userResponse.data.id,
-          username: userResponse.data.username,
-          avatar: userResponse.data.avatar,
+          discord_id: userInfo.id,
+          username: userInfo.username,
+          avatar: userInfo.avatar,
           is_admin: isAdmin,
           can_vote: canVote,
           discord_role: discordRole,
@@ -312,4 +308,59 @@ router.get("/twitter/callback", async (req, res) => {
       })
       .eq("id", userId);
 
-    if
+    if (error) {
+      console.error("Supabase Error:", error);
+
+      return res
+        .status(500)
+        .json({ message: "Failed to link Twitter account" });
+    }
+
+    res.redirect(`${TWITTER_RETURN_TO}?twitter_connect=true`);
+  } catch (err) {
+    console.error("Twitter Callback Error:", err);
+
+    res.status(500).json({ message: "Twitter callback failed" });
+  }
+});
+
+router.get("/twitter/tokens", authenticate, async (req, res) => {
+  try {
+    const { id } = req.user;
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("twitter_access_token, twitter_refresh_token")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      console.error("Supabase Error:", error);
+      return res.status(500).json({ message: "Failed to retrieve tokens" });
+    }
+
+    res.json({ access_token: data.twitter_access_token });
+  } catch (err) {
+    console.error("Error retrieving tokens:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Récupérer l'utilisateur actuellement connecté
+router.get("/me", authenticate, (req, res) => {
+  res.json({
+    id: req.user.id,
+    created_at: req.user.created_at,
+    wallet_address: req.user.wallet_address,
+    discord_id: req.user.discord_id,
+    twitter_id: req.user.twitter_id,
+    twitter_username: req.user.twitter_username,
+    username: req.user.username,
+    avatar: req.user.avatar,
+    is_admin: req.user.is_admin,
+    can_vote: req.user.can_vote,
+    discord_role: req.user.discordRole,
+  });
+});
+
+module.exports = router;
