@@ -69,6 +69,7 @@ router.get("/discord/callback", async (req, res) => {
       );
 
       userRoles = memberResponse.data.roles;
+      console.log("User roles in Monad server:", userRoles);
     } catch (error) {
       console.log("User not a member of the Monad server or Discord API error");
     }
@@ -82,40 +83,25 @@ router.get("/discord/callback", async (req, res) => {
       [process.env.MONAD_FULL_ACCESS_ROLE_ID]: "FULL_ACCESS",
     };
 
+    // Determine the highest role and if the user can vote
     let highestRole = null;
     let canVote = false;
 
+    // Iterate through user roles and assign the highest role based on priority
     for (const roleId of userRoles) {
-      switch (roleId) {
-        case process.env.MONAD_MON_ROLE_ID:
-          highestRole = "MON";
-          canVote = true;
-          break;
-        case process.env.MONAD_OG_ROLE_ID:
-          if (!highestRole) {
-            highestRole = "OG";
-            canVote = true;
-          }
-          break;
-        case process.env.MONAD_NADS_ROLE_ID:
-        case process.env.MONAD_LOCALNADS_ROLE_ID:
-          if (!highestRole) {
-            highestRole = "NAD";
-            canVote = true;
-          }
-          break;
-        case process.env.MONAD_FULL_ACCESS_ROLE_ID:
-          if (!highestRole) {
-            highestRole = "FULL_ACCESS";
-            canVote = true;
-          }
-          break;
-        default:
-          break;
-      }
-
-      if (highestRole === "MON") {
-        break;
+      const role = rolePriorities[roleId];
+      if (role) {
+        canVote = true;
+        if (
+          !highestRole ||
+          role === "MON" ||
+          (role === "OG" && highestRole !== "MON") ||
+          (role === "NAD" && highestRole !== "MON" && highestRole !== "OG") ||
+          (role === "FULL_ACCESS" &&
+            !["MON", "OG", "NAD"].includes(highestRole))
+        ) {
+          highestRole = role;
+        }
       }
     }
 
@@ -326,6 +312,7 @@ router.get("/twitter/tokens", authenticate, async (req, res) => {
 router.get("/me", authenticate, (req, res) => {
   res.json({
     id: req.user.id,
+    created_at: req.user.created_at,
     wallet_address: req.user.wallet_address,
     discord_id: req.user.discord_id,
     twitter_id: req.user.twitter_id,
