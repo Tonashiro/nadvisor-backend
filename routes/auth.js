@@ -58,7 +58,11 @@ function determineHighestRoleAndVoting(userRoles, rolePriorities, roleNames) {
         highestRole = roleNames[roleId];
       }
       canVote = true; // User can vote if they have any mapped role
-      if (priority === 1) break; // Stop if MON role is found
+      // Ensure MON role is prioritized and stops further checks
+      if (priority === 1) {
+        highestRole = roleNames[roleId];
+        break;
+      }
     }
   }
 
