@@ -145,7 +145,7 @@ router.get("/discord/callback", async (req, res) => {
 
     if (existingUser) {
       // Update the existing user
-      const { data: updatedUser } = await supabase
+      const { data: updatedUser, error: updateError } = await supabase
         .from("users")
         .update({
           username: userResponse.data.username,
@@ -158,10 +158,17 @@ router.get("/discord/callback", async (req, res) => {
         .select()
         .single();
 
+      if (updateError) {
+        console.error("Error updating user in Supabase:", updateError);
+        return res
+          .status(500)
+          .json({ message: "Failed to update user in Supabase" });
+      }
+
       user = updatedUser;
     } else {
       // Create a new user
-      const { data: newUser } = await supabase
+      const { data: newUser, error: insertError } = await supabase
         .from("users")
         .insert({
           discord_id: userResponse.data.id,
@@ -173,6 +180,13 @@ router.get("/discord/callback", async (req, res) => {
         })
         .select()
         .single();
+
+      if (insertError) {
+        console.error("Error creating user in Supabase:", insertError);
+        return res
+          .status(500)
+          .json({ message: "Failed to create user in Supabase" });
+      }
 
       user = newUser;
     }
