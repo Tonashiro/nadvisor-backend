@@ -46,7 +46,8 @@ router.get("/", async (req, res) => {
 
     // Sorting and pagination
     query = query
-      .order(sort, { ascending: order === "asc" })
+      .order("nads_verified", { ascending: false }) // Prioritize nads_verified projects
+      .order(sort, { ascending: order === "asc" }) // Secondary sorting
       .range((page - 1) * limit, page * limit - 1);
 
     const { data, error } = await query;

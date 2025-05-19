@@ -39,6 +39,7 @@ CREATE TABLE projects (
   votes_for INTEGER DEFAULT 0,
   votes_against INTEGER DEFAULT 0,
   nads_verified BOOLEAN DEFAULT FALSE,
+  nads_verified_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
   created_by UUID REFERENCES users(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
