@@ -49,6 +49,7 @@ router.get("/discord/callback", async (req, res) => {
 
     const { access_token } = tokenResponse.data;
 
+    console.log("Discord access token:", access_token);
     // Fetch user info from Discord
     let userResponse;
     try {
