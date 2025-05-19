@@ -76,31 +76,32 @@ router.get("/discord/callback", async (req, res) => {
 
     // Define role priorities
     const rolePriorities = {
-      [process.env.MONAD_MON_ROLE_ID]: "MON",
-      [process.env.MONAD_OG_ROLE_ID]: "OG",
-      [process.env.MONAD_NADS_ROLE_ID]: "NAD",
-      [process.env.MONAD_LOCALNADS_ROLE_ID]: "NAD",
-      [process.env.MONAD_FULL_ACCESS_ROLE_ID]: "FULL_ACCESS",
+      [process.env.MONAD_MON_ROLE_ID]: 1, // Highest priority
+      [process.env.MONAD_OG_ROLE_ID]: 2,
+      [process.env.MONAD_NADS_ROLE_ID]: 3,
+      [process.env.MONAD_LOCALNADS_ROLE_ID]: 3,
+      [process.env.MONAD_FULL_ACCESS_ROLE_ID]: 4, // Lowest priority
     };
 
     // Determine the highest role and if the user can vote
+    let highestPriority = Infinity;
     let highestRole = null;
     let canVote = false;
 
-    // Iterate through user roles and assign the highest role based on priority
     for (const roleId of userRoles) {
-      const role = rolePriorities[roleId];
-      if (role) {
-        canVote = true;
-        if (
-          !highestRole ||
-          role === "MON" ||
-          (role === "OG" && highestRole !== "MON") ||
-          (role === "NAD" && highestRole !== "MON" && highestRole !== "OG") ||
-          (role === "FULL_ACCESS" &&
-            !["MON", "OG", "NAD"].includes(highestRole))
-        ) {
-          highestRole = role;
+      const priority = rolePriorities[roleId];
+      if (priority) {
+        canVote = true; // User has at least one valid role
+        if (priority < highestPriority) {
+          highestPriority = priority;
+          highestRole = Object.keys(rolePriorities).find(
+            (key) => rolePriorities[key] === priority
+          );
+        }
+
+        // Stop iterating if the highest-priority role ("MON") is found
+        if (priority == 1) {
+          break;
         }
       }
     }
