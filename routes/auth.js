@@ -50,11 +50,29 @@ router.get("/discord/callback", async (req, res) => {
     const { access_token } = tokenResponse.data;
 
     // Fetch user info from Discord
-    const userResponse = await axios.get("https://discord.com/api/users/@me", {
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-      },
-    });
+    let userResponse;
+    try {
+      userResponse = await axios.get("https://discord.com/api/users/@me", {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Error fetching user info from Discord:",
+        error.response?.data || error.message
+      );
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch user info from Discord" });
+    }
+
+    if (!userResponse || !userResponse.data || !userResponse.data.id) {
+      console.error("Invalid user response from Discord:", userResponse?.data);
+      return res
+        .status(500)
+        .json({ message: "Invalid user response from Discord" });
+    }
 
     // Fetch user's roles in the Monad server
     let userRoles = [];
