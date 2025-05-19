@@ -133,6 +133,11 @@ router.get("/discord/callback", async (req, res) => {
       roleNames
     );
 
+    console.log("User Info:", userInfo);
+    console.log("User Roles:", userRoles);
+    console.log("Discord Role:", discordRole);
+    console.log("Can Vote:", canVote);
+
     // Check if the user is an admin
     const isAdmin = process.env.ADMIN_DISCORD_IDS.split(",").includes(
       userInfo.id
