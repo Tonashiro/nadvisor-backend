@@ -119,16 +119,15 @@ router.get("/discord/callback", async (req, res) => {
     let canVote = false;
 
     for (const roleId of userRoles) {
-      const priority = rolePriorities[roleId];
-      if (priority) {
-        canVote = true; // User has at least one valid role
+      if (rolePriorities.hasOwnProperty(roleId)) {
+        const priority = rolePriorities[roleId];
         if (priority < highestPriority) {
           highestPriority = priority;
           highestRole = roleNames[roleId];
         }
 
         // Stop iterating if the highest-priority role ("MON") is found
-        if (priority == 1) {
+        if (priority === 1) {
           break;
         }
       }
@@ -313,59 +312,4 @@ router.get("/twitter/callback", async (req, res) => {
       })
       .eq("id", userId);
 
-    if (error) {
-      console.error("Supabase Error:", error);
-
-      return res
-        .status(500)
-        .json({ message: "Failed to link Twitter account" });
-    }
-
-    res.redirect(`${TWITTER_RETURN_TO}?twitter_connect=true`);
-  } catch (err) {
-    console.error("Twitter Callback Error:", err);
-
-    res.status(500).json({ message: "Twitter callback failed" });
-  }
-});
-
-router.get("/twitter/tokens", authenticate, async (req, res) => {
-  try {
-    const { id } = req.user;
-
-    const { data, error } = await supabase
-      .from("users")
-      .select("twitter_access_token, twitter_refresh_token")
-      .eq("id", id)
-      .single();
-
-    if (error) {
-      console.error("Supabase Error:", error);
-      return res.status(500).json({ message: "Failed to retrieve tokens" });
-    }
-
-    res.json({ access_token: data.twitter_access_token });
-  } catch (err) {
-    console.error("Error retrieving tokens:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Récupérer l'utilisateur actuellement connecté
-router.get("/me", authenticate, (req, res) => {
-  res.json({
-    id: req.user.id,
-    created_at: req.user.created_at,
-    wallet_address: req.user.wallet_address,
-    discord_id: req.user.discord_id,
-    twitter_id: req.user.twitter_id,
-    twitter_username: req.user.twitter_username,
-    username: req.user.username,
-    avatar: req.user.avatar,
-    is_admin: req.user.is_admin,
-    can_vote: req.user.canVote,
-    discord_role: req.user.discordRole,
-  });
-});
-
-module.exports = router;
+    if
