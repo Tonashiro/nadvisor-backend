@@ -127,6 +127,7 @@ router.get("/discord/callback", async (req, res) => {
 
     const discordRole = highestRole;
 
+    console.log("User response from Discord:", userResponse.data);
     console.log("Discord highest role:", discordRole);
     // Check if the user is an admin
     const isAdmin = process.env.ADMIN_DISCORD_IDS.split(",").includes(
