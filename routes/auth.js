@@ -82,24 +82,44 @@ router.get("/discord/callback", async (req, res) => {
       [process.env.MONAD_FULL_ACCESS_ROLE_ID]: "FULL_ACCESS",
     };
 
-    // Determine the highest role and if the user can vote
     let highestRole = null;
     let canVote = false;
 
     for (const roleId of userRoles) {
-      if (rolePriorities[roleId]) {
-        canVote = true; // User has at least one valid role
-        if (
-          !highestRole ||
-          Object.keys(rolePriorities).indexOf(roleId) <
-            Object.keys(rolePriorities).indexOf(highestRole)
-        ) {
-          highestRole = roleId;
-        }
+      switch (roleId) {
+        case process.env.MONAD_MON_ROLE_ID:
+          highestRole = "MON";
+          canVote = true;
+          break;
+        case process.env.MONAD_OG_ROLE_ID:
+          if (!highestRole) {
+            highestRole = "OG";
+            canVote = true;
+          }
+          break;
+        case process.env.MONAD_NADS_ROLE_ID:
+        case process.env.MONAD_LOCALNADS_ROLE_ID:
+          if (!highestRole) {
+            highestRole = "NAD";
+            canVote = true;
+          }
+          break;
+        case process.env.MONAD_FULL_ACCESS_ROLE_ID:
+          if (!highestRole) {
+            highestRole = "FULL_ACCESS";
+            canVote = true;
+          }
+          break;
+        default:
+          break;
+      }
+
+      if (highestRole === "MON") {
+        break;
       }
     }
 
-    const discordRole = highestRole ? rolePriorities[highestRole] : null;
+    const discordRole = highestRole;
 
     // Check if the user is an admin
     const isAdmin = process.env.ADMIN_DISCORD_IDS.split(",").includes(
