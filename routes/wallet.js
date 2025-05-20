@@ -48,6 +48,7 @@ router.post("/", authenticate, async (req, res) => {
     // Return the updated user response
     res.json({
       id: updatedUser.id,
+      created_at: updatedUser.created_at,
       wallet_address: updatedUser.wallet_address,
       discord_id: updatedUser.discord_id,
       twitter_id: updatedUser.twitter_id,

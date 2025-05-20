@@ -203,7 +203,13 @@ router.get("/me", authenticate, async (req, res) => {
       createdAt: vote.created_at,
     }));
 
-    res.json(formattedVotes);
+    // Retrieve the total votes count
+    const totalVotes = formattedVotes.length;
+
+    res.json({
+      totalVotes,
+      votes: formattedVotes,
+    });
   } catch (error) {
     console.error("Error while retrieving votes:", error);
     res.status(500).json({ message: "Server error" });
@@ -361,10 +367,6 @@ async function checkAndUpdateNadsVerified(projectId) {
       console.error("Error updating project verification status:", updateError);
       throw updateError;
     }
-
-    console.log(
-      `Project ${projectId} verification status updated: ${isVerified}`
-    );
   } catch (error) {
     console.error("Error in checkAndUpdateNadsVerified:", error);
     throw error;
