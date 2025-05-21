@@ -64,14 +64,24 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
         // Check and update project verification status
         await checkAndUpdateNadsVerified(projectId);
 
-        // Retrieve updated vote stats
+        // Retrieve updated vote stats and votes breakdown
         const { data: updatedProject, error: statsError } = await supabase
           .from("projects")
-          .select("votes_for, votes_against")
+          .select(
+            "votes_for, votes_against, project_votes_by_role(role, votes_for, votes_against)"
+          )
           .eq("id", projectId)
           .single();
 
         if (statsError) throw statsError;
+
+        const votesBreakdown = updatedProject.project_votes_by_role.map(
+          (roleData) => ({
+            role: roleData.role,
+            votes_for: roleData.votes_for,
+            votes_against: roleData.votes_against,
+          })
+        );
 
         return res.json({
           message: "Vote removed successfully",
@@ -81,6 +91,7 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
             total: updatedProject.votes_for + updatedProject.votes_against,
             score: updatedProject.votes_for - updatedProject.votes_against,
           },
+          votesBreakdown,
         });
       }
 
@@ -110,14 +121,24 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
       // Check and update project verification status
       await checkAndUpdateNadsVerified(projectId);
 
-      // Retrieve updated vote stats
+      // Retrieve updated vote stats and votes breakdown
       const { data: updatedProject, error: statsError } = await supabase
         .from("projects")
-        .select("votes_for, votes_against")
+        .select(
+          "votes_for, votes_against, project_votes_by_role(role, votes_for, votes_against)"
+        )
         .eq("id", projectId)
         .single();
 
       if (statsError) throw statsError;
+
+      const votesBreakdown = updatedProject.project_votes_by_role.map(
+        (roleData) => ({
+          role: roleData.role,
+          votes_for: roleData.votes_for,
+          votes_against: roleData.votes_against,
+        })
+      );
 
       return res.json({
         message: "Vote updated successfully",
@@ -128,6 +149,7 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
           total: updatedProject.votes_for + updatedProject.votes_against,
           score: updatedProject.votes_for - updatedProject.votes_against,
         },
+        votesBreakdown,
       });
     } else {
       // Create a new vote
@@ -151,14 +173,24 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
       // Check and update project verification status
       await checkAndUpdateNadsVerified(projectId);
 
-      // Retrieve updated vote stats
+      // Retrieve updated vote stats and votes breakdown
       const { data: updatedProject, error: statsError } = await supabase
         .from("projects")
-        .select("votes_for, votes_against")
+        .select(
+          "votes_for, votes_against, project_votes_by_role(role, votes_for, votes_against)"
+        )
         .eq("id", projectId)
         .single();
 
       if (statsError) throw statsError;
+
+      const votesBreakdown = updatedProject.project_votes_by_role.map(
+        (roleData) => ({
+          role: roleData.role,
+          votes_for: roleData.votes_for,
+          votes_against: roleData.votes_against,
+        })
+      );
 
       return res.json({
         message: "Vote recorded successfully",
@@ -169,6 +201,7 @@ router.post("/:projectId", authenticate, canVote, async (req, res) => {
           total: updatedProject.votes_for + updatedProject.votes_against,
           score: updatedProject.votes_for - updatedProject.votes_against,
         },
+        votesBreakdown,
       });
     }
   } catch (error) {

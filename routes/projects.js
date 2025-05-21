@@ -22,14 +22,7 @@ router.get("/categories", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const {
-      status,
-      category,
-      sort = "created_at",
-      order = "desc",
-      page = 1,
-      limit = 10,
-    } = req.query;
+    const { category, page = 1, limit = 10 } = req.query;
 
     // Build the base query
     let query = supabase.from("projects").select(`
@@ -39,17 +32,7 @@ router.get("/", async (req, res) => {
         votes_breakdown:project_votes_by_role(role, votes_for, votes_against)
       `);
 
-    // Filter by status if specified
-    if (status) {
-      query = query.eq("status", status);
-    }
-
-    // Sorting and pagination
-    query = query
-      .order("nads_verified", { ascending: false }) // Prioritize nads_verified projects
-      .order(sort, { ascending: order === "asc" }) // Secondary sorting
-      .range((page - 1) * limit, page * limit - 1);
-
+    // Fetch projects
     const { data, error } = await query;
 
     if (error) throw error;
@@ -64,8 +47,39 @@ router.get("/", async (req, res) => {
       );
     }
 
-    // Format the response
-    const formattedProjects = filteredProjects.map((project) => ({
+    // Calculate the total upvotes from NAD, OG, and MON roles for sorting
+    const relevantRoles = ["NAD", "OG", "MON"];
+    const sortedProjects = filteredProjects
+      .map((project) => {
+        const relevantVotes = project.votes_breakdown
+          .filter((vote) => relevantRoles.includes(vote.role))
+          .reduce((sum, vote) => sum + vote.votes_for, 0);
+
+        return {
+          ...project,
+          relevantVotes,
+        };
+      })
+      .sort((a, b) => {
+        // Prioritize nads_verified projects first
+        if (a.nads_verified !== b.nads_verified) {
+          return b.nads_verified - a.nads_verified;
+        }
+        // Then sort by relevantVotes in descending order
+        return b.relevantVotes - a.relevantVotes;
+      });
+
+    // Paginate the results
+    const paginatedProjects = sortedProjects.slice(
+      (page - 1) * limit,
+      page * limit
+    );
+
+    // Get the total count for pagination
+    const totalCount = sortedProjects.length;
+
+    // Format the response for frontend compatibility
+    const formattedProjects = paginatedProjects.map((project) => ({
       ...project,
       created_by: project.created_by
         ? {
@@ -74,13 +88,8 @@ router.get("/", async (req, res) => {
           }
         : null,
       categories: project.categories.map((c) => c.category),
-      votes_breakdown: project.votes_breakdown || [], // Include votes breakdown
+      votes_breakdown: project.votes_breakdown || [],
     }));
-
-    // Get the total count for pagination
-    const { count: totalCount } = await supabase
-      .from("projects")
-      .select("*", { count: "exact", head: true });
 
     res.json({
       projects: formattedProjects,
