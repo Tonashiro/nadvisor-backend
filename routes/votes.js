@@ -352,7 +352,7 @@ async function checkAndUpdateNadsVerified(projectId) {
     });
 
     // Check if the project meets the criteria
-    const isVerified = totalVotes >= 100 && totalForVotes / totalVotes >= 0.8;
+    const isVerified = totalVotes >= 10 && totalForVotes / totalVotes >= 0.8;
 
     // Update the project with the new verification status
     const { error: updateError } = await supabase
