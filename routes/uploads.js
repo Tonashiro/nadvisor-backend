@@ -1,7 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const supabase = require("../config/supabase");
-const { authenticate } = require("../middlewares/auth");
+const { authenticate, isAdmin } = require("../middlewares/auth");
 const router = express.Router();
 
 const storage = multer.memoryStorage();
@@ -10,6 +10,7 @@ const upload = multer({ storage });
 router.post(
   "/",
   authenticate,
+  isAdmin,
   upload.fields([
     { name: "projectLogo", maxCount: 1 },
     { name: "projectBanner", maxCount: 1 },
@@ -18,10 +19,7 @@ router.post(
     try {
       const files = req.files;
 
-      if (!files.projectLogo || files.projectLogo.length === 0) {
-        return res.status(400).json({ message: "Project logo is required." });
-      }
-
+      // Helper function to upload a file to Supabase
       const uploadToSupabase = async (file, prefix) => {
         const fileName = `${prefix}-${Date.now()}-${file.originalname}`;
 
@@ -41,11 +39,19 @@ router.post(
         return data.publicUrl;
       };
 
-      const logoUrl = await uploadToSupabase(files.projectLogo[0], "logo");
-      const bannerUrl = files.projectBanner?.[0]
-        ? await uploadToSupabase(files.projectBanner[0], "banner")
-        : null;
+      // Upload projectLogo if provided
+      let logoUrl = null;
+      if (files.projectLogo && files.projectLogo.length > 0) {
+        logoUrl = await uploadToSupabase(files.projectLogo[0], "logo");
+      }
 
+      // Upload projectBanner if provided
+      let bannerUrl = null;
+      if (files.projectBanner && files.projectBanner.length > 0) {
+        bannerUrl = await uploadToSupabase(files.projectBanner[0], "banner");
+      }
+
+      // Return the uploaded URLs
       res.status(200).json({ logoUrl, bannerUrl });
     } catch (err) {
       console.error("Upload error:", err);

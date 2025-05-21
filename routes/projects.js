@@ -258,8 +258,17 @@ router.post("/", authenticate, isAdmin, async (req, res) => {
 router.put("/:id", authenticate, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, website, twitter, discord, categories, status } =
-      req.body;
+    const {
+      name,
+      description,
+      website,
+      twitter,
+      discord,
+      categories,
+      status,
+      logo_url,
+      banner_url,
+    } = req.body;
 
     // Validate categories array
     if (
@@ -294,6 +303,8 @@ router.put("/:id", authenticate, isAdmin, async (req, res) => {
         twitter,
         discord,
         status,
+        logo_url,
+        banner_url,
       })
       .eq("id", id)
       .select()
