@@ -4,15 +4,12 @@ const supabase = require("../config/supabase");
 
 router.get("/", async (req, res) => {
   try {
-    const { data: uniqueVotersData, error: uniqueVotersError } = await supabase
-      .from("votes")
-      .select("user_id", { count: "exact" });
+    const { data: uniqueVotersData, error: uniqueVotersError } =
+      await supabase.rpc("count_distinct_user_ids");
 
     if (uniqueVotersError) throw uniqueVotersError;
 
-    const uniqueVotersCount = new Set(
-      uniqueVotersData.map((vote) => vote.user_id)
-    ).size;
+    const uniqueVotersCount = uniqueVotersData || 0;
 
     const { count: totalVotesCount, error: totalVotesError } = await supabase
       .from("votes")
