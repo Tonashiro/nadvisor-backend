@@ -22,7 +22,7 @@ router.get("/categories", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const { category, page = 1, limit = 10 } = req.query;
+    const { category, page = 1, limit = 10, onlyNew } = req.query;
 
     // Build the base query
     let query = supabase.from("projects").select(`
@@ -31,6 +31,13 @@ router.get("/", async (req, res) => {
         categories:project_categories(category:categories(id, name)),
         votes_breakdown:project_votes_by_role(role, votes_for, votes_against)
       `);
+
+    if (onlyNew === "true") {
+      const threeDaysAgo = new Date();
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+      query = query.gt("created_at", threeDaysAgo.toISOString());
+    }
 
     // Fetch projects
     const { data, error } = await query;
