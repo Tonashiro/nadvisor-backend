@@ -22,7 +22,7 @@ router.get("/categories", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const { category, page = 1, limit = 10, onlyNew } = req.query;
+    const { category, page = 1, limit = 10, onlyNew, q } = req.query;
 
     // Build the base query
     let query = supabase.from("projects").select(`
@@ -31,6 +31,12 @@ router.get("/", async (req, res) => {
         categories:project_categories(category:categories(id, name)),
         votes_breakdown:project_votes_by_role(role, votes_for, votes_against)
       `);
+
+    // Add search functionality
+    if (q && q.trim()) {
+      const searchTerm = q.trim();
+      query = query.ilike('name', `%${searchTerm}%`);
+    }
 
     if (onlyNew === "true") {
       const threeDaysAgo = new Date();
