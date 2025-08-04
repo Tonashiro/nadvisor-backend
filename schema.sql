@@ -75,6 +75,7 @@ CREATE TABLE project_votes_by_role (
 -- Insérer quelques catégories de base
 INSERT INTO categories (id, name, description) VALUES
 ('60e1ec12-8188-4310-885c-51590fe0043d', 'DeFi', 'Decentralized Finance'),
+('89fef89f-086a-4ee4-a300-219cdfb74340', 'Devnads', 'Devnads Projects'),
 ('7ac5e36a-c1ff-48ca-8ea4-a0a0df197bf9', 'NFT', 'Non-Fungible Tokens'),
 ('c2927e05-37c2-4239-ada7-dc62417329cf', 'DAO', 'Decentralized Autonomous Organizations'),
 ('ef938e1b-1fbc-4d62-b1d7-1f1e4ec79daf', 'Gaming', 'Blockchain Gaming'),
