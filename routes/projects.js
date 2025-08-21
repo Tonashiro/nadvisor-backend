@@ -23,6 +23,8 @@ router.get("/categories", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const { category, page = 1, limit = 10, onlyNew, q } = req.query;
+    const pageNumber = parseInt(page, 10) || 1;
+    const limitNumber = parseInt(limit, 10) || 10;
 
     // Build the base query
     let query = supabase.from("projects").select(`
@@ -50,10 +52,20 @@ router.get("/", async (req, res) => {
 
     if (error) throw error;
 
-    // Filter projects by category if necessary (client-side due to join)
+    // Defensive server-side filtering for search (in addition to DB filter) — by name only
     let filteredProjects = data;
+    if (q && q.trim()) {
+      const searchTerm = q.trim().toLowerCase();
+      filteredProjects = filteredProjects.filter(
+        (project) =>
+          typeof project.name === "string" &&
+          project.name.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // Filter projects by category if necessary (client-side due to join)
     if (category) {
-      filteredProjects = data.filter((project) =>
+      filteredProjects = filteredProjects.filter((project) =>
         project.categories.some(
           (c) => c.category.id === category || c.category.name === category
         )
@@ -84,8 +96,8 @@ router.get("/", async (req, res) => {
 
     // Paginate the results
     const paginatedProjects = sortedProjects.slice(
-      (page - 1) * limit,
-      page * limit
+      (pageNumber - 1) * limitNumber,
+      pageNumber * limitNumber
     );
 
     // Get the total count for pagination
@@ -108,9 +120,9 @@ router.get("/", async (req, res) => {
       projects: formattedProjects,
       pagination: {
         total: totalCount,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(totalCount / limit),
+        page: pageNumber,
+        limit: limitNumber,
+        pages: Math.ceil(totalCount / limitNumber),
       },
     });
   } catch (error) {
